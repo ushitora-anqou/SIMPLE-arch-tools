@@ -14,6 +14,6 @@ runtest(){
 
 # FE  DCB  A98  7654  3210
 # 11  Rs   Rd   op3   d
-runtest "C0F0" 0
+runtest "8001C0F0" 1
 
 echo "ok"
