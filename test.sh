@@ -12,6 +12,8 @@ runtest(){
     [ $res -eq $2 ] || fail "[ERROR] \"$1\": expect $2 but got $res"
 }
 
-runtest "0000" 0
+# FE  DCB  A98  7654  3210
+# 11  Rs   Rd   op3   d
+runtest "C0F0" 0
 
 echo "ok"
