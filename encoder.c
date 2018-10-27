@@ -17,16 +17,38 @@ uint8_t hexchar2int(char ch)
     return ch;
 }
 
-int main(int argc, char **argv)
+void putword(uint16_t n)
 {
-    assert(argc == 2);
-    char *src = argv[1];
-    int size = strlen(src);
-    assert(size % 2 == 0);  // assume that strlen(src) is even.
+    // TODO: assume that SIMPLE arch is big endian.
+    putchar(n >> 8);
+    putchar(n);
+}
 
-    for (int i = 0; i < size / 2; i++) {
-        uint8_t c =
-            (hexchar2int(src[i * 2]) << 4) | (hexchar2int(src[i * 2 + 1]));
-        putchar(c);
+int main()
+{
+    while (1) {
+        char op;
+        if (scanf(" %c [", &op) == EOF) break;
+        // fprintf(stderr, "'%c'\n", op);
+        switch (op) {
+            case 'a': {
+                // 11 Rs(3) Rd(3) op3(4) d(4)
+                int rs, rd, op3, d;
+                scanf("%d %d %d %d ]", &rs, &rd, &op3, &d);
+                putword((3 << 14) | (rs << 11) | (rd << 8) | (op3 << 4) | d);
+                break;
+            }
+
+            case 'c': {
+                // 10 op2(3) Rb(3) d(8)
+                int op2, rb, d;
+                scanf("%d %d %d ]", &op2, &rb, &d);
+                putword((2 << 14) | (op2 << 11) | (rb << 8) | d);
+                break;
+            }
+
+            default:
+                assert(0);
+        }
     }
 }

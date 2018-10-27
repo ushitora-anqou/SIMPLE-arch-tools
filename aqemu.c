@@ -16,11 +16,18 @@ int eval()
 
         p++;
         switch (op) {
-            case 2: {  // LI
+            case 2: {
                 int op2 = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
                 int8_t d = code & 0xff;
-                assert(op2 == 0);
-                res[rb] = d;  // r[Rb] = sign_ext(d)
+
+                switch (op2) {
+                    case 0:           // LI
+                        res[rb] = d;  // r[Rb] = sign_ext(d)
+                        break;
+
+                    default:
+                        assert(0);
+                }
             } break;
 
             case 3: {
@@ -28,8 +35,15 @@ int eval()
                     op3 = (code >> 4) & 0x0f, d = code & 0x0f;
 
                 switch (op3) {
+                    case 0x06:  // MoV
+                        res[rd] = res[rs];
+                        break;
+
                     case 0x0f:  // HALT
                         return res[0];
+
+                    default:
+                        assert(0);
                 }
             } break;
         }
