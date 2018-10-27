@@ -5,6 +5,17 @@
 
 static uint16_t *p;
 static uint16_t mem[64 * 1024], res[8];
+static uint16_t cflag;
+enum { S, Z, C, V };
+
+void set_cflag(int sz, int c, int v)
+{
+    cflag = 0;
+    if (sz < 0) cflag |= (1 << S);
+    if (sz == 0) cflag |= (1 << Z);
+    if (c) cflag |= (1 << C);
+    if (v) cflag |= (1 << V);
+}
 
 int eval()
 {
@@ -35,8 +46,9 @@ int eval()
                     op3 = (code >> 4) & 0x0f, d = code & 0x0f;
 
                 switch (op3) {
-                    case 0x06:  // MoV
+                    case 0x06:  // MOV
                         res[rd] = res[rs];
+                        set_cflag(res[rd], 0, 0);
                         break;
 
                     case 0x0f:  // HALT
