@@ -59,6 +59,44 @@ int main()
 {
     char op[256];
     while (scanf("%s", op) != EOF) {
+        if (streql(op, "ADD")) {
+            int rd, rs;
+            read_reg_reg(&rd, &rs);
+            put23344(3, rs, rd, 0, 0);
+        }
+
+        if (streql(op, "SUB")) {
+            int rd, rs;
+            read_reg_reg(&rd, &rs);
+            put23344(3, rs, rd, 1, 0);
+        }
+
+        if (streql(op, "AND")) {
+            int rd, rs;
+            read_reg_reg(&rd, &rs);
+            put23344(3, rs, rd, 2, 0);
+        }
+
+        if (streql(op, "OR")) {
+            int rd, rs;
+            read_reg_reg(&rd, &rs);
+            put23344(3, rs, rd, 3, 0);
+        }
+
+        if (streql(op, "XOR")) {
+            int rd, rs;
+            read_reg_reg(&rd, &rs);
+            put23344(3, rs, rd, 4, 0);
+        }
+
+        /*
+        if (streql(op, "CMP")) {
+            int rd, rs;
+            read_reg_reg(&rd, &rs);
+            put23344(3, rs, rd, 5, 0);
+        }
+        */
+
         if (streql(op, "MOV")) {
             int rd, rs;
             read_reg_reg(&rd, &rs);

@@ -81,5 +81,32 @@ LI  R1, 3
 MOV R0, R1
 HLT" 3
 
+test_aqasm "
+LI  R0, 3
+ADD R0, R0
+HLT" 6
+
+test_aqasm "
+LI  R0, 3
+SUB R0, R0
+HLT" 0
+
+test_aqasm "
+LI  R0, 5
+LI  R1, 1
+AND R0, R1
+HLT" 1
+
+test_aqasm "
+LI  R0, 5
+LI  R1, 2
+OR  R0, R1
+HLT" 7
+
+test_aqasm "
+LI  R0, 5
+LI  R1, 1
+XOR R0, R1
+HLT" 4
 
 echo "ok"
