@@ -136,4 +136,20 @@ B   1
 LI  R0, 2
 HLT" 1
 
+test_aqasm "
+LI  R1, 0
+LD  R0, 0(R1)
+HLT" 0
+
+test_aqasm "
+LI  R1, 0
+LD  R0, 1(R1)
+HLT" 1
+
+test_aqasm "
+LI  R1, 100
+ST  R1, 0(R1)
+LD  R0, 0(R1)
+HLT" 100
+
 echo "ok"

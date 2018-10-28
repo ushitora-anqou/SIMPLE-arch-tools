@@ -61,6 +61,14 @@ void read_imm(int *v)
     assert_byte(*v);
 }
 
+void read_reg_mem(int *ra, int *rb, int *d)
+{
+    assert(scanf(" R%d , %d ( R%d )", ra, d, rb) == 3);
+    assert_reg(*ra);
+    assert_reg(*rb);
+    assert_byte(*d);
+}
+
 int main()
 {
     char op[256];
@@ -131,6 +139,18 @@ int main()
             int rd, d;
             read_reg_imm(&rd, &d);
             put23344(3, 0, rd, 11, d);
+        }
+
+        if (streql(op, "LD")) {
+            int ra, rb, d;
+            read_reg_mem(&ra, &rb, &d);
+            put2338(0, ra, rb, d);
+        }
+
+        if (streql(op, "ST")) {
+            int ra, rb, d;
+            read_reg_mem(&ra, &rb, &d);
+            put2338(1, ra, rb, d);
         }
 
         if (streql(op, "LI")) {
