@@ -94,6 +94,21 @@ int eval()
                         set_cflag(res[rd], c, v);
                     } break;
 
+                    case 0x02:  // AND
+                        res[rd] = res[rd] & res[rs];
+                        set_cflag(res[rd], 0, 0);
+                        break;
+
+                    case 0x03:  // OR
+                        res[rd] = res[rd] | res[rs];
+                        set_cflag(res[rd], 0, 0);
+                        break;
+
+                    case 0x04:  // XOR
+                        res[rd] = res[rd] ^ res[rs];
+                        set_cflag(res[rd], 0, 0);
+                        break;
+
                     case 0x06:  // MOV
                         res[rd] = res[rs];
                         set_cflag(res[rd], 0, 0);
