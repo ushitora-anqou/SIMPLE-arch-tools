@@ -76,7 +76,9 @@ test_aqasm(){
 
 ### asm
 
-test_aqasm "HLT" 0
+test_aqasm "
+LI R0,3
+HLT" 3
 
 
 echo "ok"
