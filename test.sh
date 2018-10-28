@@ -131,12 +131,6 @@ SRA R0, 1
 HLT" 255
 
 test_aqasm "
-LI  R0, 1
-B   1
-LI  R0, 2
-HLT" 1
-
-test_aqasm "
 LI  R1, 0
 LD  R0, 0(R1)
 HLT" 0
@@ -151,5 +145,27 @@ LI  R1, 100
 ST  R1, 0(R1)
 LD  R0, 0(R1)
 HLT" 100
+
+test_aqasm "
+LI  R0, 1
+B   1
+LI  R0, 2
+HLT" 1
+
+test_aqasm "
+LI  R0, 1
+LI  R1, 1
+CMP R0, R1
+BE 1
+LI  R0, 0
+HLT" 1
+
+test_aqasm "
+LI  R0, 1
+LI  R1, 1
+CMP R0, R1
+BNE 1
+LI  R0, 0
+HLT" 0
 
 echo "ok"

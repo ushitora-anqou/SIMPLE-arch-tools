@@ -103,13 +103,11 @@ int main()
             put23344(3, rs, rd, 4, 0);
         }
 
-        /*
         if (streql(op, "CMP")) {
             int rd, rs;
             read_reg_reg(&rd, &rs);
             put23344(3, rs, rd, 5, 0);
         }
-        */
 
         if (streql(op, "MOV")) {
             int rd, rs;
@@ -163,6 +161,18 @@ int main()
             int d;
             read_imm(&d);
             put2338(2, 4, 0, d);
+        }
+
+        if (streql(op, "BE")) {
+            int d;
+            read_imm(&d);
+            put2338(2, 7, 0, d);
+        }
+
+        if (streql(op, "BNE")) {
+            int d;
+            read_imm(&d);
+            put2338(2, 7, 3, d);
         }
 
         if (streql(op, "HLT")) put23344(3, 0, 0, 15, 0);
