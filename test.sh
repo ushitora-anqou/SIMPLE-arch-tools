@@ -45,5 +45,8 @@ runtest "c[0 0 7] a[1 0 10 2] a[0 0 15 0]" 1
 runtest "c[0 0 -2] a[1 0 11 1] a[0 0 15 0]" 255
 # reg[0] <- 2; reg[0] <- SRA(reg[0], 1); HLT
 runtest "c[0 0 2] a[1 0 11 1] a[0 0 15 0]" 1
+# reg[0] <- 2; B 1; reg[0] <- 1; HLT
+runtest "c[0 0 3] c[4 0 1] c[0 0 1] a[0 0 15 0]" 3
+
 
 echo "ok"

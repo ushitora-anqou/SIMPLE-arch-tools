@@ -45,8 +45,21 @@ int eval()
                 int8_t d = code & 0xff;
 
                 switch (op2) {
-                    case 0:           // LI
+                    case 0x00:        // LI
                         res[rb] = d;  // r[Rb] = sign_ext(d)
+                        break;
+
+                    case 0x01:  // reserved
+                    case 0x02:  // reserved
+                    case 0x03:  // reserved
+                    case 0x05:  // reserved
+                    case 0x06:  // reserved
+                        break;
+
+                    case 0x04:  // B
+                        // PC = PC + 1 + sign_ext(d)
+                        // note that '+ 1' is executed by 'p++' above.
+                        p = p + d;
                         break;
 
                     default:
