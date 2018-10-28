@@ -25,7 +25,10 @@ int clz(uint32_t n)
     return 32 - __builtin_clz((unsigned int)n);
 }
 
-uint32_t max(uint32_t lhs, uint32_t rhs) { return lhs > rhs ? lhs : rhs; }
+uint32_t max(uint32_t lhs, uint32_t rhs)
+{
+    return lhs > rhs ? lhs : rhs;
+}
 
 int eval()
 {

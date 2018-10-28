@@ -1,0 +1,8 @@
+BasedOnStyle: google
+AccessModifierOffset : -4
+AllowShortIfStatementsOnASingleLine : true
+AllowShortFunctionsOnASingleLine : None
+AlwaysBreakTemplateDeclarations : true
+Standard : C++11
+BreakBeforeBraces : Stroustrup
+IndentWidth : 4
