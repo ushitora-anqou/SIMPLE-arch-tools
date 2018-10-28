@@ -76,6 +76,24 @@ int eval()
                         set_cflag(res[rd], c, v);
                     } break;
 
+                    case 0x01: {  // SUB
+                        // need 0xffff mask because of integer promotion
+                        int pl = max(clz(res[rd]), clz((-res[rs]) & 0xffff));
+                        uint32_t uv = ((uint32_t)(res[rd] - res[rs])) & 0xffff;
+                        int c = pl < clz(uv);
+
+                        // check overflow
+                        int16_t a = res[rd], b = res[rs];
+                        int16_t sv = a - b;
+                        int v = 0;
+                        if (a >= 0 && b < 0 && sv < 0 ||
+                            a < 0 && b >= 0 && sv >= 0)
+                            v = 1;
+
+                        res[rd] = uv;
+                        set_cflag(res[rd], c, v);
+                    } break;
+
                     case 0x06:  // MOV
                         res[rd] = res[rs];
                         set_cflag(res[rd], 0, 0);
