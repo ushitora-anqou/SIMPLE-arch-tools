@@ -55,6 +55,12 @@ void read_reg_reg(int *lhs, int *rhs)
     assert_reg(*rhs);
 }
 
+void read_imm(int *v)
+{
+    assert(scanf(" %d", v) == 1);
+    assert_byte(*v);
+}
+
 int main()
 {
     char op[256];
@@ -131,6 +137,12 @@ int main()
             int rb, d;
             read_reg_imm(&rb, &d);
             put2338(2, 0, rb, d);
+        }
+
+        if (streql(op, "B")) {
+            int d;
+            read_imm(&d);
+            put2338(2, 4, 0, d);
         }
 
         if (streql(op, "HLT")) put23344(3, 0, 0, 15, 0);

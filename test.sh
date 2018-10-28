@@ -130,4 +130,10 @@ LI  R0, -2
 SRA R0, 1
 HLT" 255
 
+test_aqasm "
+LI  R0, 1
+B   1
+LI  R0, 2
+HLT" 1
+
 echo "ok"
