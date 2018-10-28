@@ -114,6 +114,27 @@ int eval()
                         set_cflag(res[rd], 0, 0);
                         break;
 
+                    case 0x07:  // reserved
+                        break;
+
+                    case 0x08:  // SLL
+                        res[rd] = res[rd] << d;
+                        break;
+
+                    case 0x09:  // SLR
+                        res[rd] = (res[rd] << d) | (res[rd] >> (16 - d));
+                        break;
+
+                    case 0x0A:  // SRL
+                        res[rd] = res[rd] >> d;
+                        break;
+
+                    case 0x0B: {  // SRA
+                        int plus = res[rd] & (1 << 15);
+                        res[rd] = (res[rd] >> d) |
+                                  (plus ? 0 : (((1 << d) - 1) << (16 - d)));
+                    } break;
+
                     case 0x0f:  // HALT
                         return res[0];
 
