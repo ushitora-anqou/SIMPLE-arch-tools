@@ -54,6 +54,14 @@ int main()
                 break;
             }
 
+            case 'b': {
+                // op1(2) Ra(3) Rb(3) d(8)
+                int op1, ra, rb, d;
+                scanf("%d %d %d %d ]", &op1, &ra, &rb, &d);
+                put2338(op1, ra, rb, d);
+                break;
+            }
+
             case 'c': {
                 // 10 op2(3) Rb(3) d(8)
                 int op2, rb, d;

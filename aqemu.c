@@ -65,7 +65,22 @@ int eval()
 
         p++;
         switch (op) {
-            case 2: {
+            case 0x00: {  // LD
+                int ra = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
+                int8_t d = code & 0xff;
+                uint8_t *addr = (uint8_t *)(&mem[reg[rb] + d]);
+                reg[ra] = (*addr << 8) | (*(addr + 1));
+            } break;
+
+            case 0x01: {  // ST
+                int ra = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
+                int8_t d = code & 0xff;
+                uint8_t *addr = (uint8_t *)(&mem[reg[rb] + d]);
+                *addr = reg[ra] >> 8;
+                *(addr + 1) = reg[ra] & 0xff;
+            } break;
+
+            case 0x02: {
                 int op2 = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
                 int8_t d = code & 0xff;
 
@@ -115,7 +130,7 @@ int eval()
                 }
             } break;
 
-            case 3: {
+            case 0x03: {
                 int rs = (code >> 11) & 0x07, rd = (code >> 8) & 0x07,
                     op3 = (code >> 4) & 0x0f, d = code & 0x0f;
 
