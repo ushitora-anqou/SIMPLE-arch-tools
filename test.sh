@@ -109,4 +109,25 @@ LI  R1, 1
 XOR R0, R1
 HLT" 4
 
+test_aqasm "
+LI  R0, 1
+SLR R0, 1
+HLT" 2
+
+test_aqasm "
+LI  R0, 1
+SLL R0, 15
+SLR R0, 1
+HLT" 1
+
+test_aqasm "
+LI  R0, 3
+SRL R0, 1
+HLT" 1
+
+test_aqasm "
+LI  R0, -2
+SRA R0, 1
+HLT" 255
+
 echo "ok"

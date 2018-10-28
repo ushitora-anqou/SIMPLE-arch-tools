@@ -103,6 +103,30 @@ int main()
             put23344(3, rs, rd, 6, 0);
         }
 
+        if (streql(op, "SLL")) {
+            int rd, d;
+            read_reg_imm(&rd, &d);
+            put23344(3, 0, rd, 8, d);
+        }
+
+        if (streql(op, "SLR")) {
+            int rd, d;
+            read_reg_imm(&rd, &d);
+            put23344(3, 0, rd, 9, d);
+        }
+
+        if (streql(op, "SRL")) {
+            int rd, d;
+            read_reg_imm(&rd, &d);
+            put23344(3, 0, rd, 10, d);
+        }
+
+        if (streql(op, "SRA")) {
+            int rd, d;
+            read_reg_imm(&rd, &d);
+            put23344(3, 0, rd, 11, d);
+        }
+
         if (streql(op, "LI")) {
             int rb, d;
             read_reg_imm(&rb, &d);
