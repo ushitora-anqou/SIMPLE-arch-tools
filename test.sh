@@ -77,7 +77,8 @@ test_aqasm(){
 ### asm
 
 test_aqasm "
-LI R0,3
+LI  R1, 3
+MOV R0, R1
 HLT" 3
 
 

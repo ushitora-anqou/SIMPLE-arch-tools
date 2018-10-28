@@ -43,28 +43,31 @@ void assert_byte(int n)
 
 void read_reg_imm(int *lhs, int *rhs)
 {
-    scanf(" R%d , %d", lhs, rhs);
+    assert(scanf(" R%d , %d", lhs, rhs) == 2);
+    assert_reg(*lhs);
+    assert_byte(*rhs);
+}
+
+void read_reg_reg(int *lhs, int *rhs)
+{
+    assert(scanf(" R%d , R%d", lhs, rhs) == 2);
+    assert_reg(*lhs);
+    assert_reg(*rhs);
 }
 
 int main()
 {
     char op[256];
     while (scanf("%s", op) != EOF) {
-        /*
         if (streql(op, "MOV")) {
             int rd, rs;
-            scanf("%d,%d", &rd, &rs);
-            assert(0 <= rd && rd < 8);
-            assert(0 <= rs && rs < 8);
+            read_reg_reg(&rd, &rs);
             put23344(3, rs, rd, 6, 0);
         }
-        */
 
         if (streql(op, "LI")) {
             int rb, d;
             read_reg_imm(&rb, &d);
-            assert_reg(rb);
-            assert_byte(d);
             put2338(2, 0, rb, d);
         }
 
