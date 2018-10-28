@@ -15,7 +15,13 @@ runtest(){
 # FE  DCB  A98  7654  3210
 # 11  Rs   Rd   op3   d
 #runtest "8001C0F0" 1
-runtest "c[0 0 1] a[0 0 15 0]" 1;
-runtest "c[0 1 1] a[1 0 6 0] a[0 0 15 0]" 1;
+# reg[0] <- 1; HLT
+runtest "c[0 0 1] a[0 0 15 0]" 1
+# reg[1] <- 1; reg[0] <- reg[1]; HLT
+runtest "c[0 1 1] a[1 0 6 0] a[0 0 15 0]" 1
+# reg[0] <- 1; reg[1] <- 2; reg[0] <- reg[0] + reg[1]; HLT
+runtest "c[0 0 1] c[0 1 2] a[1 0 0 0] a[0 0 15 0]" 3
+# reg[0] <- 1; reg[1] <- -1; reg[0] <- reg[0] + reg[1]; HLT
+runtest "c[0 0 1] c[0 1 -1] a[1 0 0 0] a[0 0 15 0]" 0
 
 echo "ok"

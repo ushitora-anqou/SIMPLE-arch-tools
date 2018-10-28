@@ -24,6 +24,21 @@ void putword(uint16_t n)
     putchar(n);
 }
 
+void put23344(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e)
+{
+    a &= 0x03;
+    b &= 0x07;
+    c &= 0x07;
+    d &= 0x0f;
+    e &= 0x0f;
+    putword((a << 14) | (b << 11) | (c << 8) | (d << 4) | e);
+}
+
+void put2338(uint8_t a, uint8_t b, uint8_t c, uint8_t d)
+{
+    put23344(a, b, c, d >> 4, d);
+}
+
 int main()
 {
     while (1) {
@@ -35,7 +50,7 @@ int main()
                 // 11 Rs(3) Rd(3) op3(4) d(4)
                 int rs, rd, op3, d;
                 scanf("%d %d %d %d ]", &rs, &rd, &op3, &d);
-                putword((3 << 14) | (rs << 11) | (rd << 8) | (op3 << 4) | d);
+                put23344(3, rs, rd, op3, d);
                 break;
             }
 
@@ -43,11 +58,12 @@ int main()
                 // 10 op2(3) Rb(3) d(8)
                 int op2, rb, d;
                 scanf("%d %d %d ]", &op2, &rb, &d);
-                putword((2 << 14) | (op2 << 11) | (rb << 8) | d);
+                put2338(2, op2, rb, d);
                 break;
             }
 
             default:
+                fprintf(stderr, "'%c'\n", op);
                 assert(0);
         }
     }
