@@ -5,7 +5,7 @@
 
 typedef uint16_t Word;
 static Word *p;
-static Word mem[64 * 1024], res[8];
+static Word mem[64 * 1024], reg[8];
 static Word cflag;
 enum { FLAG_S, FLAG_Z, FLAG_C, FLAG_V };
 
@@ -71,7 +71,7 @@ int eval()
 
                 switch (op2) {
                     case 0x00:        // LI
-                        res[rb] = d;  // r[Rb] = sign_ext(d)
+                        reg[rb] = d;  // r[Rb] = sign_ext(d)
                         break;
 
                     case 0x01:  // reserved
@@ -121,30 +121,30 @@ int eval()
 
                 switch (op3) {
                     case 0x00: {  // ADD
-                        int pl = max(clz(res[rd]), clz(res[rs]));
-                        uint32_t uv = res[rd] + res[rs];
+                        int pl = max(clz(reg[rd]), clz(reg[rs]));
+                        uint32_t uv = reg[rd] + reg[rs];
                         int c = pl < clz(uv);
 
                         // check overflow
-                        int16_t a = res[rd], b = res[rs];
+                        int16_t a = reg[rd], b = reg[rs];
                         int16_t sv = a + b;
                         int v = 0;
                         if ((a >= 0 && b >= 0 && sv < 0) ||
                             (a < 0 && b < 0 && sv >= 0))
                             v = 1;
 
-                        res[rd] = uv;
-                        set_cflag(res[rd], c, v);
+                        reg[rd] = uv;
+                        set_cflag(reg[rd], c, v);
                     } break;
 
                     case 0x01: {  // SUB
                         // need 0xffff mask because of integer promotion
-                        int pl = max(clz(res[rd]), clz((-res[rs]) & 0xffff));
-                        uint32_t uv = ((uint32_t)(res[rd] - res[rs])) & 0xffff;
+                        int pl = max(clz(reg[rd]), clz((-reg[rs]) & 0xffff));
+                        uint32_t uv = ((uint32_t)(reg[rd] - reg[rs])) & 0xffff;
                         int c = pl < clz(uv);
 
                         // check overflow
-                        int16_t a = res[rd], b = res[rs];
+                        int16_t a = reg[rd], b = reg[rs];
                         int16_t sv = a - b;
                         int v = 0;
                         if ((a >= 0 && b < 0 && sv < 0) ||
@@ -152,32 +152,32 @@ int eval()
                             v = 1;
 
                         set_cflag(uv, c, v);
-                        res[rd] = uv;
+                        reg[rd] = uv;
                     } break;
 
                     case 0x02:  // AND
-                        res[rd] = res[rd] & res[rs];
-                        set_cflag(res[rd], 0, 0);
+                        reg[rd] = reg[rd] & reg[rs];
+                        set_cflag(reg[rd], 0, 0);
                         break;
 
                     case 0x03:  // OR
-                        res[rd] = res[rd] | res[rs];
-                        set_cflag(res[rd], 0, 0);
+                        reg[rd] = reg[rd] | reg[rs];
+                        set_cflag(reg[rd], 0, 0);
                         break;
 
                     case 0x04:  // XOR
-                        res[rd] = res[rd] ^ res[rs];
-                        set_cflag(res[rd], 0, 0);
+                        reg[rd] = reg[rd] ^ reg[rs];
+                        set_cflag(reg[rd], 0, 0);
                         break;
 
                     case 0x05: {  // CMP
                         // need 0xffff mask because of integer promotion
-                        int pl = max(clz(res[rd]), clz((-res[rs]) & 0xffff));
-                        uint32_t uv = ((uint32_t)(res[rd] - res[rs])) & 0xffff;
+                        int pl = max(clz(reg[rd]), clz((-reg[rs]) & 0xffff));
+                        uint32_t uv = ((uint32_t)(reg[rd] - reg[rs])) & 0xffff;
                         int c = pl < clz(uv);
 
                         // check overflow
-                        int16_t a = res[rd], b = res[rs];
+                        int16_t a = reg[rd], b = reg[rs];
                         int16_t sv = a - b;
                         int v = 0;
                         if ((a >= 0 && b < 0 && sv < 0) ||
@@ -188,33 +188,33 @@ int eval()
                     } break;
 
                     case 0x06:  // MOV
-                        res[rd] = res[rs];
-                        set_cflag(res[rd], 0, 0);
+                        reg[rd] = reg[rs];
+                        set_cflag(reg[rd], 0, 0);
                         break;
 
                     case 0x07:  // reserved
                         break;
 
                     case 0x08:  // SLL
-                        res[rd] = res[rd] << d;
+                        reg[rd] = reg[rd] << d;
                         break;
 
                     case 0x09:  // SLR
-                        res[rd] = (res[rd] << d) | (res[rd] >> (16 - d));
+                        reg[rd] = (reg[rd] << d) | (reg[rd] >> (16 - d));
                         break;
 
                     case 0x0a:  // SRL
-                        res[rd] = res[rd] >> d;
+                        reg[rd] = reg[rd] >> d;
                         break;
 
                     case 0x0b: {  // SRA
-                        int plus = res[rd] & (1 << 15);
-                        res[rd] = (res[rd] >> d) |
+                        int plus = reg[rd] & (1 << 15);
+                        reg[rd] = (reg[rd] >> d) |
                                   (plus ? 0 : (((1 << d) - 1) << (16 - d)));
                     } break;
 
                     case 0x0f:  // HALT
-                        return res[0];
+                        return reg[0];
 
                     default:
                         assert(0);
