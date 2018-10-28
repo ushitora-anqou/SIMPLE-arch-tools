@@ -62,6 +62,14 @@ int main()
                 break;
             }
 
+            case 'd': {
+                // 10 111 cond(3) d(8)
+                int cond, d;
+                scanf("%d %d ]", &cond, &d);
+                put2338(2, 7, cond, d);
+                break;
+            }
+
             default:
                 fprintf(stderr, "'%c'\n", op);
                 assert(0);

@@ -7,17 +7,42 @@ typedef uint16_t Word;
 static Word *p;
 static Word mem[64 * 1024], res[8];
 static Word cflag;
-enum { S, Z, C, V };
+enum { FLAG_S, FLAG_Z, FLAG_C, FLAG_V };
 
 // TODO: All cflags are set properly?
 void set_cflag(int sz, int c, int v)
 {
     cflag = 0;
-    if (sz < 0) cflag |= (1 << S);
-    if (sz == 0) cflag |= (1 << Z);
-    if (c) cflag |= (1 << C);
-    if (v) cflag |= (1 << V);
+    if (sz < 0) cflag |= (1 << FLAG_S);
+    if (sz == 0) cflag |= (1 << FLAG_Z);
+    if (c) cflag |= (1 << FLAG_C);
+    if (v) cflag |= (1 << FLAG_V);
 }
+
+int checkS()
+{
+    return (cflag & (1 << FLAG_S)) != 0;
+}
+
+int checkZ()
+{
+    return (cflag & (1 << FLAG_Z)) != 0;
+}
+
+int checkC()
+{
+    return (cflag & (1 << FLAG_C)) != 0;
+}
+
+int checkV()
+{
+    return (cflag & (1 << FLAG_V)) != 0;
+}
+
+#define S checkS()
+#define Z checkZ()
+#define C checkC()
+#define V checkV()
 
 int clz(uint32_t n)
 {
@@ -62,6 +87,29 @@ int eval()
                         p = p + d;
                         break;
 
+                    case 0x07: {
+                        int cond = rb;
+                        switch (cond) {
+                            case 0x00:  // BE
+                                if (Z) p += d;
+                                break;
+
+                                /*
+                            case 0x01:  // BLT
+                                if (S ^ V) p += d;
+                                break;
+
+                            case 0x02:  // BLE
+                                if (Z || (S ^ V)) p += d;
+                                break;
+                                */
+
+                            case 0x03:  // BNE
+                                if (!Z) p += d;
+                                break;
+                        }
+                    } break;
+
                     default:
                         assert(0);
                 }
@@ -81,8 +129,8 @@ int eval()
                         int16_t a = res[rd], b = res[rs];
                         int16_t sv = a + b;
                         int v = 0;
-                        if (a >= 0 && b >= 0 && sv < 0 ||
-                            a < 0 && b < 0 && sv >= 0)
+                        if ((a >= 0 && b >= 0 && sv < 0) ||
+                            (a < 0 && b < 0 && sv >= 0))
                             v = 1;
 
                         res[rd] = uv;
@@ -99,12 +147,12 @@ int eval()
                         int16_t a = res[rd], b = res[rs];
                         int16_t sv = a - b;
                         int v = 0;
-                        if (a >= 0 && b < 0 && sv < 0 ||
-                            a < 0 && b >= 0 && sv >= 0)
+                        if ((a >= 0 && b < 0 && sv < 0) ||
+                            (a < 0 && b >= 0 && sv >= 0))
                             v = 1;
 
+                        set_cflag(uv, c, v);
                         res[rd] = uv;
-                        set_cflag(res[rd], c, v);
                     } break;
 
                     case 0x02:  // AND
@@ -122,6 +170,23 @@ int eval()
                         set_cflag(res[rd], 0, 0);
                         break;
 
+                    case 0x05: {  // CMP
+                        // need 0xffff mask because of integer promotion
+                        int pl = max(clz(res[rd]), clz((-res[rs]) & 0xffff));
+                        uint32_t uv = ((uint32_t)(res[rd] - res[rs])) & 0xffff;
+                        int c = pl < clz(uv);
+
+                        // check overflow
+                        int16_t a = res[rd], b = res[rs];
+                        int16_t sv = a - b;
+                        int v = 0;
+                        if ((a >= 0 && b < 0 && sv < 0) ||
+                            (a < 0 && b >= 0 && sv >= 0))
+                            v = 1;
+
+                        set_cflag(uv, c, v);
+                    } break;
+
                     case 0x06:  // MOV
                         res[rd] = res[rs];
                         set_cflag(res[rd], 0, 0);
@@ -138,11 +203,11 @@ int eval()
                         res[rd] = (res[rd] << d) | (res[rd] >> (16 - d));
                         break;
 
-                    case 0x0A:  // SRL
+                    case 0x0a:  // SRL
                         res[rd] = res[rd] >> d;
                         break;
 
-                    case 0x0B: {  // SRA
+                    case 0x0b: {  // SRA
                         int plus = res[rd] & (1 << 15);
                         res[rd] = (res[rd] >> d) |
                                   (plus ? 0 : (((1 << d) - 1) << (16 - d)));
