@@ -171,14 +171,19 @@ HLT" 0
 ### macro
 
 test_macro(){
-    echo "$1" | ./macro > _test1.s
-    echo "$2" > _test2.s
-    diff -Bw _test1.s _test2.s
-    [ $? -eq 0 ] || fail "[ERROR] \"$1\""
+    echo "$1" | ./macro | ./assembler > _test.bin
+    ./emulator _test.bin
+    res=$?
+    [ $res -eq $2 ] || fail "[ERROR] \"$1\": expect $2 but got $res"
 }
 
 test_macro "
-MOV R1, R0" "
-MOV R1, R0"
+MOV R1, 100
+MOV R2, 200
+MOV [R1], R2
+MOV [R1 + 1], R1
+MOV R0, [R1 + 1]
+HLT" 100
+
 
 echo "ok"

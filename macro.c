@@ -131,6 +131,16 @@ int expect_integer()
     return expect_token(T_INTEGER)->ival;
 }
 
+void expect_mem(int *base_reg, int *disp)
+{
+    // [Rbase (+ disp)?]
+    expect_token(T_LBRACKET);
+    *base_reg = expect_reg();
+    *disp = 0;
+    if (pop_token_if(T_PLUS)) *disp = expect_integer();
+    expect_token(T_RBRACKET);
+}
+
 int streql(const char *lhs, const char *rhs)
 {
     return strcmp(lhs, rhs) == 0;
@@ -138,12 +148,47 @@ int streql(const char *lhs, const char *rhs)
 
 int main()
 {
-    char *op = expect_ident();
+    while (peek_token() != NULL) {
+        char *op = expect_ident();
 
-    if (streql(op, "MOV")) {
-        int lhs = expect_reg();
-        expect_token(T_COMMA);
-        int rhs = expect_reg();
-        printf("MOV R%d, R%d\n", lhs, rhs);
+        if (streql(op, "MOV")) {
+            if (match_token(T_LBRACKET)) {
+                int base_reg, disp;
+                expect_mem(&base_reg, &disp);
+                expect_token(T_COMMA);
+                int src_reg = expect_reg();
+
+                printf("ST R%d, %d(R%d)\n", src_reg, disp, base_reg);
+                continue;
+            }
+
+            int dst_reg = expect_reg();
+            expect_token(T_COMMA);
+
+            if (match_token(T_INTEGER)) {
+                // MOV Rn, imm
+                int src_imm = expect_integer();
+                printf("LI R%d, %d\n", dst_reg, src_imm);
+                continue;
+            }
+
+            if (match_token(T_LBRACKET)) {
+                // MOV Rn, [Rbase (+ disp)?]
+                int base_reg, disp;
+                expect_mem(&base_reg, &disp);
+                printf("LD R%d, %d(R%d)\n", dst_reg, disp, base_reg);
+                continue;
+            }
+
+            // MOV Rn, Rm
+            int src_reg = expect_reg();
+            printf("MOV R%d, R%d\n", dst_reg, src_reg);
+            continue;
+        }
+
+        if (streql(op, "HLT")) {
+            printf("HLT\n");
+            continue;
+        }
     }
 }
