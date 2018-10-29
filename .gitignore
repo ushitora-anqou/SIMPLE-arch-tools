@@ -53,7 +53,7 @@ dkms.conf
 
 # written for aqemu
 encoder
-aqemu
+emulator
 _test.bin
-aqasm
+assembler
 

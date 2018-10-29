@@ -1,13 +1,13 @@
 CFLAGS=-std=c11 -g3 -O0 -Wall
 
-aqemu: aqemu.c
+emulator: emulator.c
 	gcc $(CFLAGS) -o $@ $^
 
-aqasm: aqasm.c
+assembler: assembler.c
 	gcc $(CFLAGS) -o $@ $^
 
 encoder: encoder.c
 	gcc $(CFLAGS) -o $@ $^
 
-test: test.sh aqemu aqasm encoder
+test: test.sh emulator assembler encoder
 	./test.sh
