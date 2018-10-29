@@ -12,6 +12,7 @@ struct Token {
         T_LBRACKET,
         T_RBRACKET,
         T_PLUS,
+        T_MINUS,
     } kind;
 
     union {
@@ -63,6 +64,9 @@ Token *next_token()
             break;
         case '+':
             token.kind = T_PLUS;
+            break;
+        case '-':
+            token.kind = T_MINUS;
             break;
         default:
             assert(0);
@@ -128,7 +132,15 @@ int expect_reg()
 
 int expect_integer()
 {
-    return expect_token(T_INTEGER)->ival;
+    int mul = 1;
+    if (pop_token_if(T_MINUS))  //
+        mul = -1;
+    return mul * expect_token(T_INTEGER)->ival;
+}
+
+int match_integer()
+{
+    return match_token(T_MINUS) || match_token(T_INTEGER);
 }
 
 void expect_mem(int *base_reg, int *disp)
@@ -149,9 +161,9 @@ int streql(const char *lhs, const char *rhs)
 int main()
 {
     while (peek_token() != NULL) {
-        char *op = expect_ident();
+        char *ident = expect_ident();
 
-        if (streql(op, "MOV")) {
+        if (streql(ident, "MOV")) {
             if (match_token(T_LBRACKET)) {
                 int base_reg, disp;
                 expect_mem(&base_reg, &disp);
@@ -165,7 +177,7 @@ int main()
             int dst_reg = expect_reg();
             expect_token(T_COMMA);
 
-            if (match_token(T_INTEGER)) {
+            if (match_integer()) {
                 // MOV Rn, imm
                 int src_imm = expect_integer();
                 printf("LI R%d, %d\n", dst_reg, src_imm);
@@ -186,7 +198,38 @@ int main()
             continue;
         }
 
-        if (streql(op, "HLT")) {
+        {
+            char *simple_ops_reg_reg[] = {"ADD", "SUB", "AND",
+                                          "OR",  "XOR", "CMP"};
+            int i = 0, size = sizeof(simple_ops_reg_reg) / sizeof(char *);
+            for (; i < size; i++)
+                if (streql(ident, simple_ops_reg_reg[i])) break;
+            if (i < size) {
+                char *op = simple_ops_reg_reg[i];
+                int dst_reg = expect_reg();
+                expect_token(T_COMMA);
+                int src_reg = expect_reg();
+                printf("%s R%d, R%d\n", op, dst_reg, src_reg);
+                continue;
+            }
+        }
+
+        {
+            char *simple_ops_reg_imm[] = {"SLL", "SLR", "SRL", "SRA"};
+            int i = 0, size = sizeof(simple_ops_reg_imm) / sizeof(char *);
+            for (; i < size; i++)
+                if (streql(ident, simple_ops_reg_imm[i])) break;
+            if (i < size) {
+                char *op = simple_ops_reg_imm[i];
+                int dst_reg = expect_reg();
+                expect_token(T_COMMA);
+                int src_imm = expect_integer();
+                printf("%s R%d, %d\n", op, dst_reg, src_imm);
+                continue;
+            }
+        }
+
+        if (streql(ident, "HLT")) {
             printf("HLT\n");
             continue;
         }

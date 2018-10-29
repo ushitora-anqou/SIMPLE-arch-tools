@@ -178,12 +178,51 @@ test_macro(){
 }
 
 test_macro "
-MOV R1, 100
-MOV R2, 200
+MOV R1, 10
+MOV R2, 20
+ADD R1, R2
 MOV [R1], R2
 MOV [R1 + 1], R1
 MOV R0, [R1 + 1]
-HLT" 100
+HLT" 30
 
+test_macro "
+MOV R0, 5
+MOV R1, 1
+AND R0, R1
+HLT" 1
+
+test_macro "
+MOV R0, 5
+MOV R1, 2
+OR R0, R1
+HLT" 7
+
+test_macro "
+MOV R0, 5
+MOV R1, 1
+XOR R0, R1
+HLT" 4
+
+test_macro "
+MOV R0, 1
+SLR R0, 1
+HLT" 2
+
+test_macro "
+MOV R0, 1
+SLL R0, 15
+SLR R0, 1
+HLT" 1
+
+test_macro "
+MOV R0, 3
+SRL R0, 1
+HLT" 1
+
+test_macro "
+MOV R0, -2
+SRA R0, 1
+HLT" 255
 
 echo "ok"

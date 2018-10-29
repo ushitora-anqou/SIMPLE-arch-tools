@@ -78,103 +78,91 @@ int main()
             read_reg_reg(&rd, &rs);
             put23344(3, rs, rd, 0, 0);
         }
-
-        if (streql(op, "SUB")) {
+        else if (streql(op, "SUB")) {
             int rd, rs;
             read_reg_reg(&rd, &rs);
             put23344(3, rs, rd, 1, 0);
         }
-
-        if (streql(op, "AND")) {
+        else if (streql(op, "AND")) {
             int rd, rs;
             read_reg_reg(&rd, &rs);
             put23344(3, rs, rd, 2, 0);
         }
-
-        if (streql(op, "OR")) {
+        else if (streql(op, "OR")) {
             int rd, rs;
             read_reg_reg(&rd, &rs);
             put23344(3, rs, rd, 3, 0);
         }
-
-        if (streql(op, "XOR")) {
+        else if (streql(op, "XOR")) {
             int rd, rs;
             read_reg_reg(&rd, &rs);
             put23344(3, rs, rd, 4, 0);
         }
-
-        if (streql(op, "CMP")) {
+        else if (streql(op, "CMP")) {
             int rd, rs;
             read_reg_reg(&rd, &rs);
             put23344(3, rs, rd, 5, 0);
         }
-
-        if (streql(op, "MOV")) {
+        else if (streql(op, "MOV")) {
             int rd, rs;
             read_reg_reg(&rd, &rs);
             put23344(3, rs, rd, 6, 0);
         }
-
-        if (streql(op, "SLL")) {
+        else if (streql(op, "SLL")) {
             int rd, d;
             read_reg_imm(&rd, &d);
             put23344(3, 0, rd, 8, d);
         }
-
-        if (streql(op, "SLR")) {
+        else if (streql(op, "SLR")) {
             int rd, d;
             read_reg_imm(&rd, &d);
             put23344(3, 0, rd, 9, d);
         }
-
-        if (streql(op, "SRL")) {
+        else if (streql(op, "SRL")) {
             int rd, d;
             read_reg_imm(&rd, &d);
             put23344(3, 0, rd, 10, d);
         }
-
-        if (streql(op, "SRA")) {
+        else if (streql(op, "SRA")) {
             int rd, d;
             read_reg_imm(&rd, &d);
             put23344(3, 0, rd, 11, d);
         }
-
-        if (streql(op, "LD")) {
+        else if (streql(op, "LD")) {
             int ra, rb, d;
             read_reg_mem(&ra, &rb, &d);
             put2338(0, ra, rb, d);
         }
-
-        if (streql(op, "ST")) {
+        else if (streql(op, "ST")) {
             int ra, rb, d;
             read_reg_mem(&ra, &rb, &d);
             put2338(1, ra, rb, d);
         }
-
-        if (streql(op, "LI")) {
+        else if (streql(op, "LI")) {
             int rb, d;
             read_reg_imm(&rb, &d);
             put2338(2, 0, rb, d);
         }
-
-        if (streql(op, "B")) {
+        else if (streql(op, "B")) {
             int d;
             read_imm(&d);
             put2338(2, 4, 0, d);
         }
-
-        if (streql(op, "BE")) {
+        else if (streql(op, "BE")) {
             int d;
             read_imm(&d);
             put2338(2, 7, 0, d);
         }
-
-        if (streql(op, "BNE")) {
+        else if (streql(op, "BNE")) {
             int d;
             read_imm(&d);
             put2338(2, 7, 3, d);
         }
-
-        if (streql(op, "HLT")) put23344(3, 0, 0, 15, 0);
+        else if (streql(op, "HLT")) {
+            put23344(3, 0, 0, 15, 0);
+        }
+        else {
+            assert(0);
+        }
     }
 }
