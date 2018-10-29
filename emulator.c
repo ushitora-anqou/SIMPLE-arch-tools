@@ -65,176 +65,173 @@ int eval()
 
         p++;
         switch (op) {
-            case 0x00: {  // LD
-                int ra = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
-                int8_t d = code & 0xff;
-                uint8_t *addr = (uint8_t *)(&mem[reg[rb] + d]);
-                reg[ra] = (*addr << 8) | (*(addr + 1));
-            } break;
+        case 0x00: {  // LD
+            int ra = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
+            int8_t d = code & 0xff;
+            uint8_t *addr = (uint8_t *)(&mem[reg[rb] + d]);
+            reg[ra] = (*addr << 8) | (*(addr + 1));
+        } break;
 
-            case 0x01: {  // ST
-                int ra = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
-                int8_t d = code & 0xff;
-                uint8_t *addr = (uint8_t *)(&mem[reg[rb] + d]);
-                *addr = reg[ra] >> 8;
-                *(addr + 1) = reg[ra] & 0xff;
-            } break;
+        case 0x01: {  // ST
+            int ra = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
+            int8_t d = code & 0xff;
+            uint8_t *addr = (uint8_t *)(&mem[reg[rb] + d]);
+            *addr = reg[ra] >> 8;
+            *(addr + 1) = reg[ra] & 0xff;
+        } break;
 
-            case 0x02: {
-                int op2 = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
-                int8_t d = code & 0xff;
+        case 0x02: {
+            int op2 = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
+            int8_t d = code & 0xff;
 
-                switch (op2) {
-                    case 0x00:        // LI
-                        reg[rb] = d;  // r[Rb] = sign_ext(d)
-                        break;
+            switch (op2) {
+            case 0x00:        // LI
+                reg[rb] = d;  // r[Rb] = sign_ext(d)
+                break;
 
-                    case 0x01:  // reserved
-                    case 0x02:  // reserved
-                    case 0x03:  // reserved
-                    case 0x05:  // reserved
-                    case 0x06:  // reserved
-                        break;
+            case 0x01:  // reserved
+            case 0x02:  // reserved
+            case 0x03:  // reserved
+            case 0x05:  // reserved
+            case 0x06:  // reserved
+                break;
 
-                    case 0x04:  // B
-                        // PC = PC + 1 + sign_ext(d)
-                        // note that '+ 1' is executed by 'p++' above.
-                        p = p + d;
-                        break;
+            case 0x04:  // B
+                // PC = PC + 1 + sign_ext(d)
+                // note that '+ 1' is executed by 'p++' above.
+                p = p + d;
+                break;
 
-                    case 0x07: {
-                        int cond = rb;
-                        switch (cond) {
-                            case 0x00:  // BE
-                                if (Z) p += d;
-                                break;
+            case 0x07: {
+                int cond = rb;
+                switch (cond) {
+                case 0x00:  // BE
+                    if (Z) p += d;
+                    break;
 
-                                /*
-                            case 0x01:  // BLT
-                                if (S ^ V) p += d;
-                                break;
+                    /*
+                case 0x01:  // BLT
+                    if (S ^ V) p += d;
+                    break;
 
-                            case 0x02:  // BLE
-                                if (Z || (S ^ V)) p += d;
-                                break;
-                                */
+                case 0x02:  // BLE
+                    if (Z || (S ^ V)) p += d;
+                    break;
+                    */
 
-                            case 0x03:  // BNE
-                                if (!Z) p += d;
-                                break;
-                        }
-                    } break;
-
-                    default:
-                        assert(0);
+                case 0x03:  // BNE
+                    if (!Z) p += d;
+                    break;
                 }
             } break;
 
-            case 0x03: {
-                int rs = (code >> 11) & 0x07, rd = (code >> 8) & 0x07,
-                    op3 = (code >> 4) & 0x0f, d = code & 0x0f;
+            default:
+                assert(0);
+            }
+        } break;
 
-                switch (op3) {
-                    case 0x00: {  // ADD
-                        int pl = max(clz(reg[rd]), clz(reg[rs]));
-                        uint32_t uv = reg[rd] + reg[rs];
-                        int c = pl < clz(uv);
+        case 0x03: {
+            int rs = (code >> 11) & 0x07, rd = (code >> 8) & 0x07,
+                op3 = (code >> 4) & 0x0f, d = code & 0x0f;
 
-                        // check overflow
-                        int16_t a = reg[rd], b = reg[rs];
-                        int16_t sv = a + b;
-                        int v = 0;
-                        if ((a >= 0 && b >= 0 && sv < 0) ||
-                            (a < 0 && b < 0 && sv >= 0))
-                            v = 1;
+            switch (op3) {
+            case 0x00: {  // ADD
+                int pl = max(clz(reg[rd]), clz(reg[rs]));
+                uint32_t uv = reg[rd] + reg[rs];
+                int c = pl < clz(uv);
 
-                        reg[rd] = uv;
-                        set_cflag(reg[rd], c, v);
-                    } break;
+                // check overflow
+                int16_t a = reg[rd], b = reg[rs];
+                int16_t sv = a + b;
+                int v = 0;
+                if ((a >= 0 && b >= 0 && sv < 0) || (a < 0 && b < 0 && sv >= 0))
+                    v = 1;
 
-                    case 0x01: {  // SUB
-                        // need 0xffff mask because of integer promotion
-                        int pl = max(clz(reg[rd]), clz((-reg[rs]) & 0xffff));
-                        uint32_t uv = ((uint32_t)(reg[rd] - reg[rs])) & 0xffff;
-                        int c = pl < clz(uv);
-
-                        // check overflow
-                        int16_t a = reg[rd], b = reg[rs];
-                        int16_t sv = a - b;
-                        int v = 0;
-                        if ((a >= 0 && b < 0 && sv < 0) ||
-                            (a < 0 && b >= 0 && sv >= 0))
-                            v = 1;
-
-                        set_cflag(uv, c, v);
-                        reg[rd] = uv;
-                    } break;
-
-                    case 0x02:  // AND
-                        reg[rd] = reg[rd] & reg[rs];
-                        set_cflag(reg[rd], 0, 0);
-                        break;
-
-                    case 0x03:  // OR
-                        reg[rd] = reg[rd] | reg[rs];
-                        set_cflag(reg[rd], 0, 0);
-                        break;
-
-                    case 0x04:  // XOR
-                        reg[rd] = reg[rd] ^ reg[rs];
-                        set_cflag(reg[rd], 0, 0);
-                        break;
-
-                    case 0x05: {  // CMP
-                        // need 0xffff mask because of integer promotion
-                        int pl = max(clz(reg[rd]), clz((-reg[rs]) & 0xffff));
-                        uint32_t uv = ((uint32_t)(reg[rd] - reg[rs])) & 0xffff;
-                        int c = pl < clz(uv);
-
-                        // check overflow
-                        int16_t a = reg[rd], b = reg[rs];
-                        int16_t sv = a - b;
-                        int v = 0;
-                        if ((a >= 0 && b < 0 && sv < 0) ||
-                            (a < 0 && b >= 0 && sv >= 0))
-                            v = 1;
-
-                        set_cflag(uv, c, v);
-                    } break;
-
-                    case 0x06:  // MOV
-                        reg[rd] = reg[rs];
-                        set_cflag(reg[rd], 0, 0);
-                        break;
-
-                    case 0x07:  // reserved
-                        break;
-
-                    case 0x08:  // SLL
-                        reg[rd] = reg[rd] << d;
-                        break;
-
-                    case 0x09:  // SLR
-                        reg[rd] = (reg[rd] << d) | (reg[rd] >> (16 - d));
-                        break;
-
-                    case 0x0a:  // SRL
-                        reg[rd] = reg[rd] >> d;
-                        break;
-
-                    case 0x0b: {  // SRA
-                        int plus = reg[rd] & (1 << 15);
-                        reg[rd] = (reg[rd] >> d) |
-                                  (plus ? 0 : (((1 << d) - 1) << (16 - d)));
-                    } break;
-
-                    case 0x0f:  // HALT
-                        return reg[0];
-
-                    default:
-                        assert(0);
-                }
+                reg[rd] = uv;
+                set_cflag(reg[rd], c, v);
             } break;
+
+            case 0x01: {  // SUB
+                // need 0xffff mask because of integer promotion
+                int pl = max(clz(reg[rd]), clz((-reg[rs]) & 0xffff));
+                uint32_t uv = ((uint32_t)(reg[rd] - reg[rs])) & 0xffff;
+                int c = pl < clz(uv);
+
+                // check overflow
+                int16_t a = reg[rd], b = reg[rs];
+                int16_t sv = a - b;
+                int v = 0;
+                if ((a >= 0 && b < 0 && sv < 0) || (a < 0 && b >= 0 && sv >= 0))
+                    v = 1;
+
+                set_cflag(uv, c, v);
+                reg[rd] = uv;
+            } break;
+
+            case 0x02:  // AND
+                reg[rd] = reg[rd] & reg[rs];
+                set_cflag(reg[rd], 0, 0);
+                break;
+
+            case 0x03:  // OR
+                reg[rd] = reg[rd] | reg[rs];
+                set_cflag(reg[rd], 0, 0);
+                break;
+
+            case 0x04:  // XOR
+                reg[rd] = reg[rd] ^ reg[rs];
+                set_cflag(reg[rd], 0, 0);
+                break;
+
+            case 0x05: {  // CMP
+                // need 0xffff mask because of integer promotion
+                int pl = max(clz(reg[rd]), clz((-reg[rs]) & 0xffff));
+                uint32_t uv = ((uint32_t)(reg[rd] - reg[rs])) & 0xffff;
+                int c = pl < clz(uv);
+
+                // check overflow
+                int16_t a = reg[rd], b = reg[rs];
+                int16_t sv = a - b;
+                int v = 0;
+                if ((a >= 0 && b < 0 && sv < 0) || (a < 0 && b >= 0 && sv >= 0))
+                    v = 1;
+
+                set_cflag(uv, c, v);
+            } break;
+
+            case 0x06:  // MOV
+                reg[rd] = reg[rs];
+                set_cflag(reg[rd], 0, 0);
+                break;
+
+            case 0x07:  // reserved
+                break;
+
+            case 0x08:  // SLL
+                reg[rd] = reg[rd] << d;
+                break;
+
+            case 0x09:  // SLR
+                reg[rd] = (reg[rd] << d) | (reg[rd] >> (16 - d));
+                break;
+
+            case 0x0a:  // SRL
+                reg[rd] = reg[rd] >> d;
+                break;
+
+            case 0x0b: {  // SRA
+                int plus = reg[rd] & (1 << 15);
+                reg[rd] =
+                    (reg[rd] >> d) | (plus ? 0 : (((1 << d) - 1) << (16 - d)));
+            } break;
+
+            case 0x0f:  // HALT
+                return reg[0];
+
+            default:
+                assert(0);
+            }
+        } break;
         }
     }
 

@@ -46,41 +46,41 @@ int main()
         if (scanf(" %c [", &op) == EOF) break;
         // fprintf(stderr, "'%c'\n", op);
         switch (op) {
-            case 'a': {
-                // 11 Rs(3) Rd(3) op3(4) d(4)
-                int rs, rd, op3, d;
-                scanf("%d %d %d %d ]", &rs, &rd, &op3, &d);
-                put23344(3, rs, rd, op3, d);
-                break;
-            }
+        case 'a': {
+            // 11 Rs(3) Rd(3) op3(4) d(4)
+            int rs, rd, op3, d;
+            scanf("%d %d %d %d ]", &rs, &rd, &op3, &d);
+            put23344(3, rs, rd, op3, d);
+            break;
+        }
 
-            case 'b': {
-                // op1(2) Ra(3) Rb(3) d(8)
-                int op1, ra, rb, d;
-                scanf("%d %d %d %d ]", &op1, &ra, &rb, &d);
-                put2338(op1, ra, rb, d);
-                break;
-            }
+        case 'b': {
+            // op1(2) Ra(3) Rb(3) d(8)
+            int op1, ra, rb, d;
+            scanf("%d %d %d %d ]", &op1, &ra, &rb, &d);
+            put2338(op1, ra, rb, d);
+            break;
+        }
 
-            case 'c': {
-                // 10 op2(3) Rb(3) d(8)
-                int op2, rb, d;
-                scanf("%d %d %d ]", &op2, &rb, &d);
-                put2338(2, op2, rb, d);
-                break;
-            }
+        case 'c': {
+            // 10 op2(3) Rb(3) d(8)
+            int op2, rb, d;
+            scanf("%d %d %d ]", &op2, &rb, &d);
+            put2338(2, op2, rb, d);
+            break;
+        }
 
-            case 'd': {
-                // 10 111 cond(3) d(8)
-                int cond, d;
-                scanf("%d %d ]", &cond, &d);
-                put2338(2, 7, cond, d);
-                break;
-            }
+        case 'd': {
+            // 10 111 cond(3) d(8)
+            int cond, d;
+            scanf("%d %d ]", &cond, &d);
+            put2338(2, 7, cond, d);
+            break;
+        }
 
-            default:
-                fprintf(stderr, "'%c'\n", op);
-                assert(0);
+        default:
+            fprintf(stderr, "'%c'\n", op);
+            assert(0);
         }
     }
 }

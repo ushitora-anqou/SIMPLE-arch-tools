@@ -6,3 +6,4 @@ AlwaysBreakTemplateDeclarations : true
 Standard : C++11
 BreakBeforeBraces : Stroustrup
 IndentWidth : 4
+IndentCaseLabels : false
