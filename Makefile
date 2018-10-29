@@ -9,5 +9,8 @@ assembler: assembler.c
 encoder: encoder.c
 	gcc $(CFLAGS) -o $@ $^
 
-test: test.sh emulator assembler encoder
+macro: macro.c
+	gcc $(CFLAGS) -o $@ $^
+
+test: test.sh emulator assembler encoder macro
 	./test.sh

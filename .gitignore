@@ -56,4 +56,7 @@ encoder
 emulator
 _test.bin
 assembler
+macro
+_test1.s
+_test2.s
 

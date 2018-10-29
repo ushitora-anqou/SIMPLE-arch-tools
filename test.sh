@@ -66,15 +66,14 @@ test_emulator "c[0 1 0] b[0 0 1 1] a[0 0 15 0]" 1
 test_emulator "c[0 1 100] b[1 1 1 0] b[0 0 1 0] a[0 0 15 0]" 100
 
 
+### asm
+
 test_assembler(){
     echo "$1" | ./assembler > _test.bin
     ./emulator _test.bin
     res=$?
     [ $res -eq $2 ] || fail "[ERROR] \"$1\": expect $2 but got $res"
 }
-
-
-### asm
 
 test_assembler "
 LI  R1, 3
@@ -167,5 +166,19 @@ CMP R0, R1
 BNE 1
 LI  R0, 0
 HLT" 0
+
+
+### macro
+
+test_macro(){
+    echo "$1" | ./macro > _test1.s
+    echo "$2" > _test2.s
+    diff -Bw _test1.s _test2.s
+    [ $? -eq 0 ] || fail "[ERROR] \"$1\""
+}
+
+test_macro "
+MOV R1, R0" "
+MOV R1, R0"
 
 echo "ok"
