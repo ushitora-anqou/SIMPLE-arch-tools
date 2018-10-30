@@ -153,6 +153,16 @@ int main()
             read_imm(&d);
             put2338(2, 7, 0, d);
         }
+        else if (streql(op, "BLT")) {
+            int d;
+            read_imm(&d);
+            put2338(2, 7, 1, d);
+        }
+        else if (streql(op, "BLE")) {
+            int d;
+            read_imm(&d);
+            put2338(2, 7, 2, d);
+        }
         else if (streql(op, "BNE")) {
             int d;
             read_imm(&d);

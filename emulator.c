@@ -109,7 +109,6 @@ int eval()
                     if (Z) p += d;
                     break;
 
-                    /*
                 case 0x01:  // BLT
                     if (S ^ V) p += d;
                     break;
@@ -117,7 +116,6 @@ int eval()
                 case 0x02:  // BLE
                     if (Z || (S ^ V)) p += d;
                     break;
-                    */
 
                 case 0x03:  // BNE
                     if (!Z) p += d;
@@ -147,7 +145,7 @@ int eval()
                 if ((a >= 0 && b >= 0 && sv < 0) || (a < 0 && b < 0 && sv >= 0))
                     v = 1;
 
-                reg[rd] = uv;
+                reg[rd] = sv;
                 set_cflag(reg[rd], c, v);
             } break;
 
@@ -164,7 +162,7 @@ int eval()
                 if ((a >= 0 && b < 0 && sv < 0) || (a < 0 && b >= 0 && sv >= 0))
                     v = 1;
 
-                set_cflag(uv, c, v);
+                set_cflag(sv, c, v);
                 reg[rd] = uv;
             } break;
 
@@ -196,7 +194,7 @@ int eval()
                 if ((a >= 0 && b < 0 && sv < 0) || (a < 0 && b >= 0 && sv >= 0))
                     v = 1;
 
-                set_cflag(uv, c, v);
+                set_cflag(sv, c, v);
             } break;
 
             case 0x06:  // MOV

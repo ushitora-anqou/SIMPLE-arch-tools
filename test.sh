@@ -55,6 +55,10 @@ test_emulator "c[0 0 2] a[1 0 11 1] a[0 0 15 0]" 1
 test_emulator "c[0 0 3] c[4 0 1] c[0 0 1] a[0 0 15 0]" 3
 # reg[0] <- 1; reg[1] <- 1; CMP(reg[0], reg[1]); BE 1; reg[0] <- 0; HLT
 test_emulator "c[0 0 1] c[0 1 1] a[1 0 5 0] d[0 1] c[0 0 0] a[0 0 15 0]" 1
+# reg[0] <- 1; reg[1] <- 2; CMP(reg[0], reg[1]); BLT 1; reg[0] <- 0; HLT
+test_emulator "c[0 0 1] c[0 1 2] a[1 0 5 0] d[1 1] c[0 0 0] a[0 0 15 0]" 1
+# reg[0] <- 2; reg[1] <- 2; CMP(reg[0], reg[1]); BLE 1; reg[0] <- 0; HLT
+test_emulator "c[0 0 2] c[0 1 2] a[1 0 5 0] d[2 1] c[0 0 0] a[0 0 15 0]" 2
 # reg[0] <- 1; reg[1] <- 1; CMP(reg[0], reg[1]); BNE 1; reg[0] <- 0; HLT
 test_emulator "c[0 0 1] c[0 1 1] a[1 0 5 0] d[3 1] c[0 0 0] a[0 0 15 0]" 0
 
@@ -161,6 +165,39 @@ HLT" 1
 
 test_assembler "
 LI  R0, 1
+LI  R1, 2
+CMP R0, R1
+BLT 1
+LI  R0, 0
+HLT" 1
+
+test_assembler "
+LI  R0, 1
+LI  R1, 1
+CMP R0, R1
+BLE 1
+LI  R0, 0
+HLT" 1
+
+test_assembler "
+LI  R0, -1
+LI  R1, 2
+CMP R0, R1
+BLT 1
+LI  R0, 0
+HLT" 255
+
+test_assembler "
+LI  R0, -1
+LI  R1, -1
+CMP R0, R1
+BLE 1
+LI  R0, 0
+HLT" 255
+
+
+test_assembler "
+LI  R0, 1
 LI  R1, 1
 CMP R0, R1
 BNE 1
@@ -251,5 +288,25 @@ loop:
     CMP R0, R1
     JNE loop
     HLT" 10
+
+test_macro "
+    MOV R0, 0
+    MOV R1, 10
+    MOV R2, 1
+loop:
+    ADD R0, R2
+    CMP R0, R1
+    JL loop
+    HLT" 10
+
+test_macro "
+    MOV R0, 0
+    MOV R1, 10
+    MOV R2, 1
+loop:
+    ADD R0, R2
+    CMP R0, R1
+    JLE loop
+    HLT" 11
 
 echo "ok"

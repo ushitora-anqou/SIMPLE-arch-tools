@@ -382,8 +382,8 @@ int main()
         }
 
         {
-            char *jump_ops_src[] = {"JMP", "JE", "JNE"},
-                 *jump_ops_dst[] = {"B", "BE", "BNE"};
+            char *jump_ops_src[] = {"JMP", "JE", "JNE", "JL", "JLE"},
+                 *jump_ops_dst[] = {"B", "BE", "BNE", "BLT", "BLE"};
             int i = 0, size = sizeof(jump_ops_src) / sizeof(char *);
             for (; i < size; i++)
                 if (streql(ident, jump_ops_src[i])) break;
