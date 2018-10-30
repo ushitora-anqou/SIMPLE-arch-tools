@@ -225,4 +225,11 @@ MOV R0, -2
 SRA R0, 1
 HLT" 255
 
+test_macro "
+MOV R0, 2
+JMP exit
+MOV R0,-1
+exit:
+HLT" 2
+
 echo "ok"

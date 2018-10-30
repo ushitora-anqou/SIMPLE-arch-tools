@@ -1,6 +1,8 @@
 #include <assert.h>
 #include <ctype.h>
+#include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct Token Token;
@@ -13,6 +15,7 @@ struct Token {
         T_RBRACKET,
         T_PLUS,
         T_MINUS,
+        T_COLON,
     } kind;
 
     union {
@@ -67,6 +70,9 @@ Token *next_token()
             break;
         case '-':
             token.kind = T_MINUS;
+            break;
+        case ':':
+            token.kind = T_COLON;
             break;
         default:
             assert(0);
@@ -158,8 +164,154 @@ int streql(const char *lhs, const char *rhs)
     return strcmp(lhs, rhs) == 0;
 }
 
+char *new_string(const char *src)
+{
+    char *buf = (char *)malloc(strlen(src) + 1);
+    strcpy(buf, src);
+    return buf;
+}
+
+typedef struct Vector Vector;
+struct Vector {
+    void **data;
+    int size, rsved_size;
+};
+
+Vector *new_vector()
+{
+    Vector *ret = (Vector *)malloc(sizeof(Vector));
+    ret->size = 0;
+    ret->rsved_size = 0;
+    ret->data = NULL;
+    return ret;
+}
+
+void vector_push_back(Vector *vec, void *item)
+{
+    if (vec->size == vec->rsved_size) {
+        vec->rsved_size = vec->rsved_size > 0 ? vec->rsved_size * 2 : 2;
+        void **ndata = (void **)malloc(sizeof(void *) * vec->rsved_size);
+        memcpy(ndata, vec->data, vec->size * sizeof(void *));
+        vec->data = ndata;
+    }
+
+    vec->data[vec->size++] = item;
+}
+
+void *vector_get(Vector *vec, int i)
+{
+    if (i >= vec->size) return NULL;
+    return vec->data[i];
+}
+
+int vector_size(Vector *vec)
+{
+    return vec->size;
+}
+
+void *vector_set(Vector *vec, int i, void *item)
+{
+    assert(vec != NULL && i < vector_size(vec));
+    vec->data[i] = item;
+    return item;
+}
+
+char *vformat(const char *src, va_list ap)
+{
+    char buf[512];  // TODO: enough length?
+    vsprintf(buf, src, ap);
+
+    char *ret = (char *)malloc(strlen(buf) + 1);
+    strcpy(ret, buf);
+    return ret;
+}
+
+char *format(const char *src, ...)
+{
+    va_list args;
+    va_start(args, src);
+    char *ret = vformat(src, args);
+    va_end(args);
+    return ret;
+}
+
+Vector *emits = NULL;
+
+void emit(char *str, ...)
+{
+    va_list args;
+    va_start(args, str);
+    vector_push_back(emits, vformat(str, args));
+    va_end(args);
+}
+
+int emitted_size()
+{
+    return vector_size(emits);
+}
+
+typedef struct Pair Pair;
+struct Pair {
+    void *first, *second;
+};
+
+Pair *new_pair(void *first, void *second)
+{
+    Pair *pair = (Pair *)malloc(sizeof(Pair));
+    pair->first = first;
+    pair->second = second;
+    return pair;
+}
+
+typedef struct KeyValue KeyValue;
+struct KeyValue {
+    const char *key;
+    void *value;
+};
+
+typedef struct Map Map;
+struct Map {
+    Vector *data;
+};
+
+Map *new_map()
+{
+    Map *map = malloc(sizeof(Map));
+    map->data = new_vector();
+    return map;
+}
+
+int map_size(Map *map)
+{
+    return vector_size(map->data);
+}
+
+KeyValue *map_insert(Map *map, const char *key, void *item)
+{
+    KeyValue *kv = malloc(sizeof(KeyValue));
+    kv->key = key;
+    kv->value = item;
+    vector_push_back(map->data, kv);
+    return kv;
+}
+
+KeyValue *map_lookup(Map *map, const char *key)
+{
+    for (int i = 0; i < vector_size(map->data); i++) {
+        KeyValue *kv = (KeyValue *)vector_get(map->data, i);
+        if (strcmp(kv->key, key) == 0) return kv;
+    }
+
+    return NULL;
+}
+
 int main()
 {
+    Map *labels = new_map();
+    Vector *pending = new_vector();
+
+    emits = new_vector();
+
     while (peek_token() != NULL) {
         char *ident = expect_ident();
 
@@ -170,7 +322,7 @@ int main()
                 expect_token(T_COMMA);
                 int src_reg = expect_reg();
 
-                printf("ST R%d, %d(R%d)\n", src_reg, disp, base_reg);
+                emit("ST R%d, %d(R%d)", src_reg, disp, base_reg);
                 continue;
             }
 
@@ -180,7 +332,7 @@ int main()
             if (match_integer()) {
                 // MOV Rn, imm
                 int src_imm = expect_integer();
-                printf("LI R%d, %d\n", dst_reg, src_imm);
+                emit("LI R%d, %d", dst_reg, src_imm);
                 continue;
             }
 
@@ -188,13 +340,13 @@ int main()
                 // MOV Rn, [Rbase (+ disp)?]
                 int base_reg, disp;
                 expect_mem(&base_reg, &disp);
-                printf("LD R%d, %d(R%d)\n", dst_reg, disp, base_reg);
+                emit("LD R%d, %d(R%d)", dst_reg, disp, base_reg);
                 continue;
             }
 
             // MOV Rn, Rm
             int src_reg = expect_reg();
-            printf("MOV R%d, R%d\n", dst_reg, src_reg);
+            emit("MOV R%d, R%d", dst_reg, src_reg);
             continue;
         }
 
@@ -209,7 +361,7 @@ int main()
                 int dst_reg = expect_reg();
                 expect_token(T_COMMA);
                 int src_reg = expect_reg();
-                printf("%s R%d, R%d\n", op, dst_reg, src_reg);
+                emit("%s R%d, R%d", op, dst_reg, src_reg);
                 continue;
             }
         }
@@ -224,14 +376,50 @@ int main()
                 int dst_reg = expect_reg();
                 expect_token(T_COMMA);
                 int src_imm = expect_integer();
-                printf("%s R%d, %d\n", op, dst_reg, src_imm);
+                emit("%s R%d, %d", op, dst_reg, src_imm);
                 continue;
             }
         }
 
-        if (streql(ident, "HLT")) {
-            printf("HLT\n");
+        if (streql(ident, "JMP")) {
+            if (match_integer()) {
+                int d = expect_integer();
+                emit("B %d", d);
+                continue;
+            }
+
+            char *label_name = new_string(expect_ident());
+            vector_push_back(pending,
+                             new_pair(label_name, (void *)emitted_size()));
+            emit("B");
             continue;
         }
+
+        if (streql(ident, "HLT")) {
+            emit("HLT");
+            continue;
+        }
+
+        // label
+        char *label_name = new_string(ident);
+        expect_token(T_COLON);
+        map_insert(labels, label_name, (void *)emitted_size());
+    }
+
+    int npend = vector_size(pending);
+    for (int i = 0; i < npend; i++) {
+        Pair *pair = (Pair *)vector_get(pending, i);
+        char *label_name = pair->first;
+        int emit_index = (int)(pair->second);
+
+        int d = (int)(map_lookup(labels, label_name)->value) - emit_index - 1;
+        vector_set(emits, emit_index,
+                   format("%s %d", (char *)vector_get(emits, emit_index), d));
+    }
+
+    int nemits = emitted_size();
+    for (int i = 0; i < nemits; i++) {
+        char *str = (char *)vector_get(emits, i);
+        puts(str);
     }
 }
