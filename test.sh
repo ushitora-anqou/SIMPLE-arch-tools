@@ -232,4 +232,24 @@ MOV R0,-1
 exit:
 HLT" 2
 
+test_macro "
+    MOV R0, 0
+    MOV R1, 10
+    MOV R2, 1
+loop:
+    ADD R0, R2
+    CMP R0, R1
+    JE loop
+    HLT" 1
+
+test_macro "
+    MOV R0, 0
+    MOV R1, 10
+    MOV R2, 1
+loop:
+    ADD R0, R2
+    CMP R0, R1
+    JNE loop
+    HLT" 10
+
 echo "ok"

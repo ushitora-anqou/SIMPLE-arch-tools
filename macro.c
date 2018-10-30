@@ -381,18 +381,25 @@ int main()
             }
         }
 
-        if (streql(ident, "JMP")) {
-            if (match_integer()) {
-                int d = expect_integer();
-                emit("B %d", d);
+        {
+            char *jump_ops_src[] = {"JMP", "JE", "JNE"},
+                 *jump_ops_dst[] = {"B", "BE", "BNE"};
+            int i = 0, size = sizeof(jump_ops_src) / sizeof(char *);
+            for (; i < size; i++)
+                if (streql(ident, jump_ops_src[i])) break;
+            if (i < size) {
+                if (match_integer()) {
+                    int d = expect_integer();
+                    emit("%s %d", jump_ops_dst[i], d);
+                    continue;
+                }
+
+                char *label_name = new_string(expect_ident());
+                vector_push_back(pending,
+                                 new_pair(label_name, (void *)emitted_size()));
+                emit("%s", jump_ops_dst[i]);
                 continue;
             }
-
-            char *label_name = new_string(expect_ident());
-            vector_push_back(pending,
-                             new_pair(label_name, (void *)emitted_size()));
-            emit("B");
-            continue;
         }
 
         if (streql(ident, "HLT")) {
