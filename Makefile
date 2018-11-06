@@ -1,5 +1,7 @@
 CFLAGS=-std=c11 -g3 -O0 -Wall
 
+all: emulator assembler encoder macro
+
 emulator: emulator.c
 	gcc $(CFLAGS) -o $@ $^
 
@@ -14,3 +16,8 @@ macro: macro.c
 
 test: test.sh emulator assembler encoder macro
 	./test.sh
+
+clean:
+	rm -rf emulator assembler encoder macro
+
+.PHONY: all emulator assembler encoder macro
