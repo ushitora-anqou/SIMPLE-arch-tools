@@ -421,7 +421,9 @@ int main()
         char *label_name = pair->first;
         int emit_index = (int)(pair->second);
 
-        int d = (int)(map_lookup(labels, label_name)->value) - emit_index - 1;
+        KeyValue *kv = map_lookup(labels, label_name);
+        assert(kv != NULL);
+        int d = (int)(kv->value) - emit_index - 1;
         vector_set(emits, emit_index,
                    format("%s %d", (char *)vector_get(emits, emit_index), d));
     }
