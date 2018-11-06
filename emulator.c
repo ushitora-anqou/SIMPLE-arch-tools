@@ -58,9 +58,7 @@ uint32_t max(uint32_t lhs, uint32_t rhs)
 int eval()
 {
     while (1) {
-        // TODO: assume that SIMPLE arch is big endian.
-        uint8_t *q = (uint8_t *)p;
-        Word code = (*q << 8) | *(q + 1);
+        Word code = *p;
         int op = code >> 14;
 
         p++;
@@ -68,16 +66,13 @@ int eval()
         case 0x00: {  // LD
             int ra = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
             int8_t d = code & 0xff;
-            uint8_t *addr = (uint8_t *)(&mem[reg[rb] + d]);
-            reg[ra] = (*addr << 8) | (*(addr + 1));
+            reg[ra] = mem[reg[rb] + d];
         } break;
 
         case 0x01: {  // ST
             int ra = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
             int8_t d = code & 0xff;
-            uint8_t *addr = (uint8_t *)(&mem[reg[rb] + d]);
-            *addr = reg[ra] >> 8;
-            *(addr + 1) = reg[ra] & 0xff;
+            mem[reg[rb] + d] = reg[ra];
         } break;
 
         case 0x02: {
@@ -223,7 +218,7 @@ int eval()
                     (reg[rd] >> d) | (plus ? 0 : (((1 << d) - 1) << (16 - d)));
             } break;
 
-            case 0x0f:  // HALT
+            case 0x0f:  // HLT
                 return reg[0];
 
             default:
@@ -238,18 +233,13 @@ int eval()
 
 int main(int argc, char **argv)
 {
-    assert(argc == 2);
-
-    char *filename = argv[1];
-
-    // read the file and assign to p.
-    FILE *fh = fopen(filename, "r");
-    assert(fh != NULL);
-    fseek(fh, 0, SEEK_END);
-    long filesize = ftell(fh);
-    fseek(fh, 0, SEEK_SET);
-    fread(mem, filesize, 1, fh);
-    fclose(fh);
+    int ch, i = 0;
+    while ((ch = getchar()) != EOF) {
+        int ch2 = getchar();
+        assert(ch2 != EOF);
+        // TODO: assume that SIMPLE arch is big endian.
+        mem[i++] = ((Word)ch << 8) | (Word)ch2;
+    }
 
     p = mem;
     int ret = eval();

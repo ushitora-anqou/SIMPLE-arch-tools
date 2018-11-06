@@ -6,8 +6,7 @@ fail() {
 }
 
 test_emulator(){
-    echo "$1" | ./encoder > _test.bin
-    ./emulator _test.bin
+    echo "$1" | ./encoder | ./emulator
     res=$?
     [ $res -eq $2 ] || fail "[ERROR] \"$1\": expect $2 but got $res"
 }
@@ -73,8 +72,7 @@ test_emulator "c[0 1 100] b[1 1 1 0] b[0 0 1 0] a[0 0 15 0]" 100
 ### asm
 
 test_assembler(){
-    echo "$1" | ./assembler > _test.bin
-    ./emulator _test.bin
+    echo "$1" | ./assembler | ./emulator
     res=$?
     [ $res -eq $2 ] || fail "[ERROR] \"$1\": expect $2 but got $res"
 }
@@ -208,8 +206,7 @@ HLT" 0
 ### macro
 
 test_macro(){
-    echo "$1" | ./macro | ./assembler > _test.bin
-    ./emulator _test.bin
+    echo "$1" | ./macro | ./assembler | ./emulator
     res=$?
     [ $res -eq $2 ] || fail "[ERROR] \"$1\": expect $2 but got $res"
 }
