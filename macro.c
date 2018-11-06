@@ -5,6 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+int streql(const char *lhs, const char *rhs)
+{
+    return strcmp(lhs, rhs) == 0;
+}
+
 typedef struct Token Token;
 struct Token {
     enum {
@@ -132,6 +137,8 @@ char *expect_ident()
 int expect_reg()
 {
     char *sval = expect_ident();
+    if (streql(sval, "SP")) return 7;  // R7
+
     assert(sval[0] == 'R' && '0' <= sval[1] && sval[1] < '8');
     return sval[1] - '0';
 }
@@ -157,11 +164,6 @@ void expect_mem(int *base_reg, int *disp)
     *disp = 0;
     if (pop_token_if(T_PLUS)) *disp = expect_integer();
     expect_token(T_RBRACKET);
-}
-
-int streql(const char *lhs, const char *rhs)
-{
-    return strcmp(lhs, rhs) == 0;
 }
 
 char *new_string(const char *src)

@@ -309,4 +309,14 @@ loop:
     JLE loop
     HLT" 11
 
+test_macro "
+    MOV R0, 0
+    MOV SP, 10
+    MOV R2, 1
+loop:
+    ADD R0, R2
+    CMP R0, SP
+    JLE loop
+    HLT" 11
+
 echo "ok"
