@@ -38,7 +38,7 @@ Token *next_token()
     while ((ch = getchar()) != EOF) {
         if (isspace(ch)) continue;
 
-        if (isalpha(ch)) {  // read an identifier
+        if (isalpha(ch) || ch == '.' || ch == '_') {  // read an identifier
             int i = 0;
             sval[i++] = ch;
             while (isalnum(ch = getchar())) sval[i++] = ch;
