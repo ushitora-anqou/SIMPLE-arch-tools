@@ -115,6 +115,15 @@ int eval()
                 case 0x03:  // BNE
                     if (!Z) p += d;
                     break;
+
+                case 0x04:  // BAL
+                    reg[6] = (Word)(p - mem);
+                    p += d;
+                    break;
+
+                case 0x05:  // BR
+                    p = (Word *)(reg[6] + mem);
+                    break;
                 }
             } break;
 

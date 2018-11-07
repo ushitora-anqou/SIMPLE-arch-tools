@@ -384,8 +384,8 @@ int main()
         }
 
         {
-            char *jump_ops_src[] = {"JMP", "JE", "JNE", "JL", "JLE"},
-                 *jump_ops_dst[] = {"B", "BE", "BNE", "BLT", "BLE"};
+            char *jump_ops_src[] = {"JMP", "JE", "JNE", "JL", "JLE", "CALL"},
+                 *jump_ops_dst[] = {"B", "BE", "BNE", "BLT", "BLE", "BAL"};
             int i = 0, size = sizeof(jump_ops_src) / sizeof(char *);
             for (; i < size; i++)
                 if (streql(ident, jump_ops_src[i])) break;
@@ -402,6 +402,11 @@ int main()
                 emit("%s", jump_ops_dst[i]);
                 continue;
             }
+        }
+
+        if (streql(ident, "RET")) {
+            emit("BR");
+            continue;
         }
 
         if (streql(ident, "HLT")) {

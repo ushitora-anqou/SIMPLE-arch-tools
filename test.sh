@@ -316,4 +316,20 @@ loop:
     JLE loop
     HLT" 11
 
+test_macro "
+    JMP main
+sub2:
+    MOV R0, 20
+    RET
+sub:
+    MOV R2, R6
+    CALL sub2
+    MOV R6, R2
+    MOV R1, 10
+    ADD R0, R1
+    RET
+main:
+    CALL sub
+    HLT" 30
+
 echo "ok"

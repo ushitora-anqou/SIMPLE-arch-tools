@@ -168,6 +168,14 @@ int main()
             read_imm(&d);
             put2338(2, 7, 3, d);
         }
+        else if (streql(op, "BAL")) {
+            int d;
+            read_imm(&d);
+            put2338(2, 7, 4, d);
+        }
+        else if (streql(op, "BR")) {
+            put2338(2, 7, 5, 0);
+        }
         else if (streql(op, "HLT")) {
             put23344(3, 0, 0, 15, 0);
         }
