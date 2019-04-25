@@ -4,6 +4,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef struct {
+    int putmode;
+} Config;
+
+Config *get_config()
+{
+    static Config config;
+    return &config;
+}
+
 int streql(const char *lhs, const char *rhs)
 {
     return strcmp(lhs, rhs) == 0;
@@ -11,9 +21,22 @@ int streql(const char *lhs, const char *rhs)
 
 void putword(uint16_t n)
 {
-    // TODO: assume that SIMPLE arch is big endian.
-    putchar(n >> 8);
-    putchar(n);
+    static char hextbl[] = {'0', '1', '2', '3', '4', '5', '6', '7',
+                            '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+    switch (get_config()->putmode) {
+    case 0:
+        // TODO: assume that SIMPLE arch is big endian.
+        putchar(n >> 8);
+        putchar(n);
+        break;
+    case 1:
+        putchar(hextbl[(n >> 12) & 0xf]);
+        putchar(hextbl[(n >> 8) & 0xf]);
+        putchar(hextbl[(n >> 4) & 0xf]);
+        putchar(hextbl[n & 0xf]);
+        putchar('\n');
+        break;
+    }
 }
 
 void put23344(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e)
@@ -69,8 +92,13 @@ void read_reg_mem(int *ra, int *rb, int *d)
     assert_byte(*d);
 }
 
-int main()
+int main(int argc, char **argv)
 {
+    if (argc >= 2 && streql(argv[1], "-mif"))
+        get_config()->putmode = 1;
+    else
+        get_config()->putmode = 0;
+
     char op[256];
     while (scanf("%s", op) != EOF) {
         if (streql(op, "ADD")) {
