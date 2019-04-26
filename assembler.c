@@ -21,22 +21,19 @@ int streql(const char *lhs, const char *rhs)
 
 void putword(uint16_t n)
 {
-    static char hextbl[] = {'0', '1', '2', '3', '4', '5', '6', '7',
-                            '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+    static int nput = 0;
+
     switch (get_config()->putmode) {
-    case 0:
+    case 0:  // binary format
         // TODO: assume that SIMPLE arch is big endian.
         putchar(n >> 8);
         putchar(n);
         break;
-    case 1:
-        putchar(hextbl[(n >> 12) & 0xf]);
-        putchar(hextbl[(n >> 8) & 0xf]);
-        putchar(hextbl[(n >> 4) & 0xf]);
-        putchar(hextbl[n & 0xf]);
-        putchar('\n');
+    case 1:  // MIF format
+        printf("%04d : %04X;\n", nput, n);
         break;
     }
+    ++nput;
 }
 
 void put23344(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e)
