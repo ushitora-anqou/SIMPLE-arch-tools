@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/bash
 
 fail() {
     echo $1
@@ -202,6 +202,21 @@ BNE 1
 LI  R0, 0
 HLT" 0
 
+test_assembler_in_mif_format(){
+    res=$(echo "$1" | ./assembler -mif)
+    diff -bB <(echo "$res") <(echo "$2") || \
+        fail "[ERROR] \"$1\": expect $2 but got $res"
+}
+
+test_assembler_in_mif_format "
+LI R3, 8
+LI R5, -2
+ADD R3, R5
+B -2" "
+0000 : 8308;
+0001 : 85FE;
+0002 : EB00;
+0003 : A0FE;"
 
 ### macro
 
