@@ -20,4 +20,4 @@ test: test.sh emulator assembler encoder macro
 clean:
 	rm -rf emulator assembler encoder macro
 
-.PHONY: all emulator assembler encoder macro
+.PHONY: all test clean
