@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef uint16_t Word;
 static Word *p;
@@ -242,6 +243,9 @@ int eval()
 
 int main(int argc, char **argv)
 {
+    int flagRegOut = 0;
+    if (argc >= 2 && strcmp(argv[1], "-regout") == 0) flagRegOut = 1;
+
     int ch, i = 0;
     while ((ch = getchar()) != EOF) {
         int ch2 = getchar();
@@ -258,6 +262,10 @@ int main(int argc, char **argv)
     // if (cflag & (1 << C)) fprintf(stderr, "C ");
     // if (cflag & (1 << V)) fprintf(stderr, "V ");
     // fprintf(stderr, "\n");
+
+    if (flagRegOut)
+        for (int i = 0; i < 8; i++)
+            printf("R%d : %04X %d\n", i, reg[i], (int16_t)reg[i]);
 
     return ret;
 }
