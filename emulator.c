@@ -222,9 +222,9 @@ int eval()
                 break;
 
             case 0x0b: {  // SRA
-                int plus = reg[rd] & (1 << 15);
+                int minus = reg[rd] & (1 << 15);
                 reg[rd] =
-                    (reg[rd] >> d) | (plus ? 0 : (((1 << d) - 1) << (16 - d)));
+                    (reg[rd] >> d) | (minus ? (((1 << d) - 1) << (16 - d)) : 0);
             } break;
 
             case 0x0f:  // HLT

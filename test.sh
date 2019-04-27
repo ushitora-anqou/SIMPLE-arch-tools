@@ -132,6 +132,11 @@ SRA R0, 1
 HLT" 255
 
 test_assembler "
+LI  R0, -30
+SRA R0, 3
+HLT" 252    # actually -4
+
+test_assembler "
 LI  R1, 0
 LD  R0, 0(R1)
 HLT" 0
