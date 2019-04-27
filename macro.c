@@ -60,6 +60,12 @@ Token *next_token()
             return &token;
         }
 
+        if (ch == '#') {  // skip comment until endline
+            while ((ch = getchar()) != '\n')
+                ;
+            continue;
+        }
+
         switch (ch) {
         case ',':
             token.kind = T_COMMA;

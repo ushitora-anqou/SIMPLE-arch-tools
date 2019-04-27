@@ -333,13 +333,14 @@ loop:
 
 test_macro "
     JMP main
-sub2:
+sub2:# hoge
     MOV R0, 20
     RET
 sub:
     MOV R2, R6
     CALL sub2
-    MOV R6, R2
+    MOV R6, R2  # comment
+    # comcom
     MOV R1, 10
     ADD R0, R1
     RET
