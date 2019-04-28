@@ -51,11 +51,38 @@ Token *next_token()
         }
 
         if (isdigit(ch)) {  // read an integer
+            token.kind = T_INTEGER;
+
+            if (ch == '0') {
+                ch = getchar();
+                if (ch != 'x') {  // just 0
+                    ungetc(ch, stdin);
+                    token.ival = 0;
+                    return &token;
+                }
+
+                // hex number
+                int ival = 0;
+                while (1) {
+                    ch = getchar();
+                    if (isdigit(ch))
+                        ival = ival * 16 + ch - '0';
+                    else if ('A' <= ch && ch <= 'F')
+                        ival = ival * 16 + ch - 'A' + 10;
+                    else if ('a' <= ch && ch <= 'f')
+                        ival = ival * 16 + ch - 'a' + 10;
+                    else
+                        break;
+                }
+                ungetc(ch, stdin);
+                token.ival = ival;
+                return &token;
+            }
+
+            // decimal number
             int ival = ch - '0';
             while (isdigit(ch = getchar())) ival = ival * 10 + ch - '0';
             ungetc(ch, stdin);
-
-            token.kind = T_INTEGER;
             token.ival = ival;
             return &token;
         }
