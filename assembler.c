@@ -30,7 +30,7 @@ void putword(uint16_t n)
         putchar(n);
         break;
     case 1:  // MIF format
-        printf("%04d : %04X;\n", nput, n);
+        printf("%04X : %04X;\n", nput, n);
         break;
     }
     ++nput;
