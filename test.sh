@@ -241,6 +241,15 @@ MOV R0, [R1 + 1]
 HLT" 30
 
 test_macro "
+MOV R1, 10
+MOV R2, 20
+ADD R1, R2
+MOV [R1 - 1], R2
+MOV [R1 + 1], R1
+MOV R0, [R1 - 1]
+HLT" 20
+
+test_macro "
 MOV R0, 5
 MOV R1, 1
 AND R0, R1

@@ -168,7 +168,10 @@ void expect_mem(int *base_reg, int *disp)
     expect_token(T_LBRACKET);
     *base_reg = expect_reg();
     *disp = 0;
-    if (pop_token_if(T_PLUS)) *disp = expect_integer();
+    if (pop_token_if(T_PLUS))
+        *disp = expect_integer();
+    else if (match_token(T_MINUS))
+        *disp = expect_integer();
     expect_token(T_RBRACKET);
 }
 
