@@ -440,6 +440,18 @@ int main()
             }
         }
 
+        if (streql(ident, "IN")) {
+            int src_reg = expect_reg();
+            emit("IN R%d", src_reg);
+            continue;
+        }
+
+        if (streql(ident, "OUT")) {
+            int src_reg = expect_reg();
+            emit("OUT R%d", src_reg);
+            continue;
+        }
+
         if (streql(ident, "RET")) {
             emit("BR");
             continue;

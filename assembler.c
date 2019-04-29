@@ -61,6 +61,12 @@ void assert_byte(int n)
     assert(-128 <= n && n <= 255);
 }
 
+void read_reg(int *lhs)
+{
+    assert(scanf(" R%d", lhs) == 1);
+    assert_reg(*lhs);
+}
+
 void read_reg_imm(int *lhs, int *rhs)
 {
     assert(scanf(" R%d , %d", lhs, rhs) == 2);
@@ -203,6 +209,16 @@ int main(int argc, char **argv)
         }
         else if (streql(op, "HLT")) {
             put23344(3, 0, 0, 15, 0);
+        }
+        else if (streql(op, "IN")) {
+            int rd;
+            read_reg(&rd);
+            put23344(3, 0, rd, 12, 0);
+        }
+        else if (streql(op, "OUT")) {
+            int rs;
+            read_reg(&rs);
+            put23344(3, rs, 0, 13, 0);
         }
         else {
             assert(0);
