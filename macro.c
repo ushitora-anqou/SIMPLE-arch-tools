@@ -87,7 +87,7 @@ Token *next_token()
             return &token;
         }
 
-        if (ch == '#') {  // skip comment until endline
+        if (ch == '#' || ch == '/') {  // skip comment until endline
             while ((ch = getchar()) != '\n')
                 ;
             continue;
