@@ -1,0 +1,13 @@
+MOV R1, 5
+MOV R2, 42
+MOV R3, 13
+MOV [R1], R3
+MOV [R2], R1
+MOV [R3], R2
+MOV R4, [R3]	// R4 <- 42
+MOV R4, [R4]	// R4 <- 5
+MOV R4, [R4]	// R4 <- 13
+MOV R5, R4
+MOV R6, R5
+MOV R7, R6
+HLT
