@@ -171,6 +171,7 @@ struct Token {
         T_PLUS,
         T_MINUS,
         T_COLON,
+        T_REGISTER,
     } kind;
 
     union {
@@ -201,6 +202,9 @@ const char *token2str(Token *token)
         return "-";
     case T_COLON:
         return ":";
+    case T_REGISTER:
+        // TODO: returned pointer is not malloc-ed.
+        sprintf(buf, "R%d", token->ival);
     default:
         assert(0);
     }
@@ -225,6 +229,8 @@ const char *tokenkind2str(int kind)
         return "minus";
     case T_COLON:
         return "colon";
+    case T_REGISTER:
+        return "register";
     default:
         assert(0);
     }
@@ -253,6 +259,17 @@ Token *next_token()
         if (isalpha(ch) || ch == '.' || ch == '_') {  // read an identifier
             int i = 0;
             sval[i++] = ch;
+
+            // when register
+            if (ch == 'R') {
+                if (isdigit(ch = get_char())) {
+                    token->kind = T_REGISTER;
+                    token->ival = ch - '0';
+                    return token;
+                }
+                unget_char(ch);
+            }
+
             while (isalnum(ch = get_char())) sval[i++] = ch;
             unget_char(ch);
             sval[i++] = '\0';
@@ -385,18 +402,6 @@ char *expect_ident()
     return token->sval;
 }
 
-int expect_reg()
-{
-    Token *token = expect_token(T_IDENT);
-    char *sval = token->sval;
-    if (streql(sval, "SP")) return 7;  // R7
-
-    if (!(sval[0] == 'R' && '0' <= sval[1] && sval[1] < '8'))
-        failwith_unexpected_token(token->line_row, token->line_column,
-                                  token2str(token), "R[0-7]");
-    return sval[1] - '0';
-}
-
 int expect_integer()
 {
     int mul = 1;
@@ -414,7 +419,7 @@ void expect_mem(int *base_reg, int *disp)
 {
     // [Rbase (+ disp)?]
     expect_token(T_LBRACKET);
-    *base_reg = expect_reg();
+    *base_reg = expect_token(T_REGISTER)->ival;
     *disp = 0;
     if (pop_token_if(T_PLUS))
         *disp = expect_integer();
@@ -445,9 +450,6 @@ void preprocess()
     Token *token;
     while (token = pop_token()) vector_push_back(dst, token);
 
-    // delete vector of input_tokens
-    free(input_tokens);
-
     // set new tokens
     input_tokens = dst;
     input_tokens_npos = 0;
@@ -472,13 +474,13 @@ int main()
                 int base_reg, disp;
                 expect_mem(&base_reg, &disp);
                 expect_token(T_COMMA);
-                int src_reg = expect_reg();
+                int src_reg = expect_token(T_REGISTER)->ival;
 
                 emit("ST R%d, %d(R%d)", src_reg, disp, base_reg);
                 continue;
             }
 
-            int dst_reg = expect_reg();
+            int dst_reg = expect_token(T_REGISTER)->ival;
             expect_token(T_COMMA);
 
             if (match_integer()) {
@@ -497,13 +499,13 @@ int main()
             }
 
             // MOV Rn, Rm
-            int src_reg = expect_reg();
+            int src_reg = expect_token(T_REGISTER)->ival;
             emit("MOV R%d, R%d", dst_reg, src_reg);
             continue;
         }
 
         if (streql(ident, "ADD")) {
-            int dst_reg = expect_reg();
+            int dst_reg = expect_token(T_REGISTER)->ival;
             expect_token(T_COMMA);
 
             if (match_integer()) {
@@ -514,13 +516,13 @@ int main()
             }
 
             // ADD Rn, Rm
-            int src_reg = expect_reg();
+            int src_reg = expect_token(T_REGISTER)->ival;
             emit("ADD R%d, R%d", dst_reg, src_reg);
             continue;
         }
 
         if (streql(ident, "CMP")) {
-            int dst_reg = expect_reg();
+            int dst_reg = expect_token(T_REGISTER)->ival;
             expect_token(T_COMMA);
 
             if (match_integer()) {
@@ -531,7 +533,7 @@ int main()
             }
 
             // CMP Rn, Rm
-            int src_reg = expect_reg();
+            int src_reg = expect_token(T_REGISTER)->ival;
             emit("CMP R%d, R%d", dst_reg, src_reg);
             continue;
         }
@@ -543,9 +545,9 @@ int main()
                 if (streql(ident, simple_ops_reg_reg[i])) break;
             if (i < size) {
                 char *op = simple_ops_reg_reg[i];
-                int dst_reg = expect_reg();
+                int dst_reg = expect_token(T_REGISTER)->ival;
                 expect_token(T_COMMA);
-                int src_reg = expect_reg();
+                int src_reg = expect_token(T_REGISTER)->ival;
                 emit("%s R%d, R%d", op, dst_reg, src_reg);
                 continue;
             }
@@ -558,7 +560,7 @@ int main()
                 if (streql(ident, simple_ops_reg_imm[i])) break;
             if (i < size) {
                 char *op = simple_ops_reg_imm[i];
-                int dst_reg = expect_reg();
+                int dst_reg = expect_token(T_REGISTER)->ival;
                 expect_token(T_COMMA);
                 int src_imm = expect_integer();
                 emit("%s R%d, %d", op, dst_reg, src_imm);
@@ -588,13 +590,13 @@ int main()
         }
 
         if (streql(ident, "IN")) {
-            int src_reg = expect_reg();
+            int src_reg = expect_token(T_REGISTER)->ival;
             emit("IN R%d", src_reg);
             continue;
         }
 
         if (streql(ident, "OUT")) {
-            int src_reg = expect_reg();
+            int src_reg = expect_token(T_REGISTER)->ival;
             emit("OUT R%d", src_reg);
             continue;
         }

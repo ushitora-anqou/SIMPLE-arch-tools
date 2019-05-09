@@ -8,7 +8,3 @@ Development tools for SIMPLE architecture.
 
 Ask [anqou](https://twitter.com/ushitora_anqou).
 
-## notes
-
-- `SP` = `R7`
-- return value is stored in `R6`
