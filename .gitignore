@@ -52,11 +52,11 @@ Mkfile.old
 dkms.conf
 
 # written for aqemu
-encoder
-emulator
-_test.bin
-assembler
-macro
-_test1.s
-_test2.s
-debugger/debugger
+src/encoder
+src/emulator
+src/_test.bin
+src/assembler
+src/macro
+src/_test1.s
+src/_test2.s
+src/debugger
