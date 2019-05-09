@@ -6,6 +6,132 @@
 #include <string.h>
 #include "utility.h"
 
+char *new_string(const char *src)
+{
+    char *buf = (char *)malloc(strlen(src) + 1);
+    strcpy(buf, src);
+    return buf;
+}
+
+typedef struct Vector Vector;
+struct Vector {
+    void **data;
+    int size, rsved_size;
+};
+
+Vector *new_vector()
+{
+    Vector *ret = (Vector *)malloc(sizeof(Vector));
+    ret->size = 0;
+    ret->rsved_size = 0;
+    ret->data = NULL;
+    return ret;
+}
+
+void vector_push_back(Vector *vec, void *item)
+{
+    if (vec->size == vec->rsved_size) {
+        vec->rsved_size = vec->rsved_size > 0 ? vec->rsved_size * 2 : 2;
+        void **ndata = (void **)malloc(sizeof(void *) * vec->rsved_size);
+        memcpy(ndata, vec->data, vec->size * sizeof(void *));
+        vec->data = ndata;
+    }
+
+    vec->data[vec->size++] = item;
+}
+
+void *vector_get(Vector *vec, int i)
+{
+    if (i >= vec->size) return NULL;
+    return vec->data[i];
+}
+
+int vector_size(Vector *vec)
+{
+    return vec->size;
+}
+
+void *vector_set(Vector *vec, int i, void *item)
+{
+    assert(vec != NULL && i < vector_size(vec));
+    vec->data[i] = item;
+    return item;
+}
+
+char *vformat(const char *src, va_list ap)
+{
+    char buf[512];  // TODO: enough length?
+    vsprintf(buf, src, ap);
+
+    char *ret = (char *)malloc(strlen(buf) + 1);
+    strcpy(ret, buf);
+    return ret;
+}
+
+char *format(const char *src, ...)
+{
+    va_list args;
+    va_start(args, src);
+    char *ret = vformat(src, args);
+    va_end(args);
+    return ret;
+}
+
+typedef struct Pair Pair;
+struct Pair {
+    void *first, *second;
+};
+
+Pair *new_pair(void *first, void *second)
+{
+    Pair *pair = (Pair *)malloc(sizeof(Pair));
+    pair->first = first;
+    pair->second = second;
+    return pair;
+}
+
+typedef struct KeyValue KeyValue;
+struct KeyValue {
+    const char *key;
+    void *value;
+};
+
+typedef struct Map Map;
+struct Map {
+    Vector *data;
+};
+
+Map *new_map()
+{
+    Map *map = malloc(sizeof(Map));
+    map->data = new_vector();
+    return map;
+}
+
+int map_size(Map *map)
+{
+    return vector_size(map->data);
+}
+
+KeyValue *map_insert(Map *map, const char *key, void *item)
+{
+    KeyValue *kv = malloc(sizeof(KeyValue));
+    kv->key = key;
+    kv->value = item;
+    vector_push_back(map->data, kv);
+    return kv;
+}
+
+KeyValue *map_lookup(Map *map, const char *key)
+{
+    for (int i = 0; i < vector_size(map->data); i++) {
+        KeyValue *kv = (KeyValue *)vector_get(map->data, i);
+        if (strcmp(kv->key, key) == 0) return kv;
+    }
+
+    return NULL;
+}
+
 static int line_row = 1, line_column = 1, prev_line_column;
 
 int get_char()
@@ -114,15 +240,15 @@ _Noreturn void failwith_unexpected_token(int line_row, int line_column,
 
 Token *next_token()
 {
-    static Token token;
-    static char sval[128];
+    Token *token = (Token *)malloc(sizeof(Token));
+    char sval[128];
 
     int ch;
     while ((ch = get_char()) != EOF) {
         if (isspace(ch)) continue;
 
-        token.line_row = line_row;
-        token.line_column = line_column;
+        token->line_row = line_row;
+        token->line_column = line_column;
 
         if (isalpha(ch) || ch == '.' || ch == '_') {  // read an identifier
             int i = 0;
@@ -131,20 +257,20 @@ Token *next_token()
             unget_char(ch);
             sval[i++] = '\0';
 
-            token.kind = T_IDENT;
-            token.sval = sval;
-            return &token;
+            token->kind = T_IDENT;
+            token->sval = new_string(sval);
+            return token;
         }
 
         if (isdigit(ch)) {  // read an integer
-            token.kind = T_INTEGER;
+            token->kind = T_INTEGER;
 
             if (ch == '0') {
                 ch = get_char();
                 if (ch != 'x') {  // just 0
                     unget_char(ch);
-                    token.ival = 0;
-                    return &token;
+                    token->ival = 0;
+                    return token;
                 }
 
                 // hex number
@@ -161,16 +287,16 @@ Token *next_token()
                         break;
                 }
                 unget_char(ch);
-                token.ival = ival;
-                return &token;
+                token->ival = ival;
+                return token;
             }
 
             // decimal number
             int ival = ch - '0';
             while (isdigit(ch = get_char())) ival = ival * 10 + ch - '0';
             unget_char(ch);
-            token.ival = ival;
-            return &token;
+            token->ival = ival;
+            return token;
         }
 
         if (ch == '#' || ch == '/') {  // skip comment until endline
@@ -181,43 +307,52 @@ Token *next_token()
 
         switch (ch) {
         case ',':
-            token.kind = T_COMMA;
+            token->kind = T_COMMA;
             break;
         case '[':
-            token.kind = T_LBRACKET;
+            token->kind = T_LBRACKET;
             break;
         case ']':
-            token.kind = T_RBRACKET;
+            token->kind = T_RBRACKET;
             break;
         case '+':
-            token.kind = T_PLUS;
+            token->kind = T_PLUS;
             break;
         case '-':
-            token.kind = T_MINUS;
+            token->kind = T_MINUS;
             break;
         case ':':
-            token.kind = T_COLON;
+            token->kind = T_COLON;
             break;
         default:
             failwith(line_row, line_column - 1,
                      "Unrecognized character: \e[1m'%c'\e[m", ch);
         }
 
-        return &token;
+        return token;
     }
 
+    free(token);
     return NULL;
 }
 
-Token *pending_token = NULL;
+static Vector *input_tokens;
+static int input_tokens_npos;
+
+void read_all_tokens()
+{
+    Token *token;
+    while (token = next_token()) vector_push_back(input_tokens, token);
+}
 
 Token *pop_token()
 {
-    Token *token = pending_token;
-    if (token == NULL) token = next_token();
-    pending_token = NULL;
+    return vector_get(input_tokens, input_tokens_npos++);
+}
 
-    return token;
+Token *peek_token()
+{
+    return vector_get(input_tokens, input_tokens_npos);
 }
 
 Token *expect_token(int kind)
@@ -229,13 +364,6 @@ Token *expect_token(int kind)
                                   token2str(token), tokenkind2str(kind));
 
     return token;
-}
-
-Token *peek_token()
-{
-    if (pending_token != NULL) return pending_token;
-    pending_token = next_token();
-    return pending_token;
 }
 
 Token *match_token(int kind)
@@ -295,77 +423,6 @@ void expect_mem(int *base_reg, int *disp)
     expect_token(T_RBRACKET);
 }
 
-char *new_string(const char *src)
-{
-    char *buf = (char *)malloc(strlen(src) + 1);
-    strcpy(buf, src);
-    return buf;
-}
-
-typedef struct Vector Vector;
-struct Vector {
-    void **data;
-    int size, rsved_size;
-};
-
-Vector *new_vector()
-{
-    Vector *ret = (Vector *)malloc(sizeof(Vector));
-    ret->size = 0;
-    ret->rsved_size = 0;
-    ret->data = NULL;
-    return ret;
-}
-
-void vector_push_back(Vector *vec, void *item)
-{
-    if (vec->size == vec->rsved_size) {
-        vec->rsved_size = vec->rsved_size > 0 ? vec->rsved_size * 2 : 2;
-        void **ndata = (void **)malloc(sizeof(void *) * vec->rsved_size);
-        memcpy(ndata, vec->data, vec->size * sizeof(void *));
-        vec->data = ndata;
-    }
-
-    vec->data[vec->size++] = item;
-}
-
-void *vector_get(Vector *vec, int i)
-{
-    if (i >= vec->size) return NULL;
-    return vec->data[i];
-}
-
-int vector_size(Vector *vec)
-{
-    return vec->size;
-}
-
-void *vector_set(Vector *vec, int i, void *item)
-{
-    assert(vec != NULL && i < vector_size(vec));
-    vec->data[i] = item;
-    return item;
-}
-
-char *vformat(const char *src, va_list ap)
-{
-    char buf[512];  // TODO: enough length?
-    vsprintf(buf, src, ap);
-
-    char *ret = (char *)malloc(strlen(buf) + 1);
-    strcpy(ret, buf);
-    return ret;
-}
-
-char *format(const char *src, ...)
-{
-    va_list args;
-    va_start(args, src);
-    char *ret = vformat(src, args);
-    va_end(args);
-    return ret;
-}
-
 Vector *emits = NULL;
 
 void emit(char *str, ...)
@@ -381,59 +438,19 @@ int emitted_size()
     return vector_size(emits);
 }
 
-typedef struct Pair Pair;
-struct Pair {
-    void *first, *second;
-};
-
-Pair *new_pair(void *first, void *second)
+void preprocess()
 {
-    Pair *pair = (Pair *)malloc(sizeof(Pair));
-    pair->first = first;
-    pair->second = second;
-    return pair;
-}
+    Vector *dst = new_vector();
 
-typedef struct KeyValue KeyValue;
-struct KeyValue {
-    const char *key;
-    void *value;
-};
+    Token *token;
+    while (token = pop_token()) vector_push_back(dst, token);
 
-typedef struct Map Map;
-struct Map {
-    Vector *data;
-};
+    // delete vector of input_tokens
+    free(input_tokens);
 
-Map *new_map()
-{
-    Map *map = malloc(sizeof(Map));
-    map->data = new_vector();
-    return map;
-}
-
-int map_size(Map *map)
-{
-    return vector_size(map->data);
-}
-
-KeyValue *map_insert(Map *map, const char *key, void *item)
-{
-    KeyValue *kv = malloc(sizeof(KeyValue));
-    kv->key = key;
-    kv->value = item;
-    vector_push_back(map->data, kv);
-    return kv;
-}
-
-KeyValue *map_lookup(Map *map, const char *key)
-{
-    for (int i = 0; i < vector_size(map->data); i++) {
-        KeyValue *kv = (KeyValue *)vector_get(map->data, i);
-        if (strcmp(kv->key, key) == 0) return kv;
-    }
-
-    return NULL;
+    // set new tokens
+    input_tokens = dst;
+    input_tokens_npos = 0;
 }
 
 int main()
@@ -442,6 +459,10 @@ int main()
     Vector *pending = new_vector();
 
     emits = new_vector();
+    input_tokens = new_vector();
+
+    read_all_tokens();
+    preprocess();
 
     while (peek_token() != NULL) {
         char *ident = expect_ident();
