@@ -4,14 +4,38 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "utility.h"
 
-int streql(const char *lhs, const char *rhs)
+static int line_row = 1, line_column = 1, prev_line_column;
+
+int get_char()
 {
-    return strcmp(lhs, rhs) == 0;
+    line_column++;
+
+    int ch = getchar();
+    if (ch == '\n') {
+        prev_line_column = line_column;
+        line_row++;
+        line_column = 1;
+    }
+
+    return ch;
+}
+
+void unget_char(int ch)
+{
+    line_column--;
+    if (ch == '\n') {
+        line_row--;
+        line_column = prev_line_column;
+    }
+    ungetc(ch, stdin);
 }
 
 typedef struct Token Token;
 struct Token {
+    int line_row, line_column;
+
     enum {
         T_IDENT,
         T_INTEGER,
@@ -29,20 +53,82 @@ struct Token {
     };
 };
 
+const char *token2str(Token *token)
+{
+    static char buf[128];
+    switch (token->kind) {
+    case T_IDENT:
+        return token->sval;
+    case T_INTEGER:
+        // TODO: returned pointer is not malloc-ed.
+        sprintf(buf, "%d", token->ival);
+        return buf;
+    case T_COMMA:
+        return ",";
+    case T_LBRACKET:
+        return "[";
+    case T_RBRACKET:
+        return "]";
+    case T_PLUS:
+        return "+";
+    case T_MINUS:
+        return "-";
+    case T_COLON:
+        return ":";
+    default:
+        assert(0);
+    }
+}
+
+const char *tokenkind2str(int kind)
+{
+    switch (kind) {
+    case T_IDENT:
+        return "identifier";
+    case T_INTEGER:
+        return "integer";
+    case T_COMMA:
+        return "comma";
+    case T_LBRACKET:
+        return "left bracket";
+    case T_RBRACKET:
+        return "right bracket";
+    case T_PLUS:
+        return "plus";
+    case T_MINUS:
+        return "minus";
+    case T_COLON:
+        return "colon";
+    default:
+        assert(0);
+    }
+}
+
+_Noreturn void failwith_unexpected_token(int line_row, int line_column,
+                                         const char *got, const char *expected)
+{
+    failwith(line_row, line_column,
+             "Unexpected token: got \e[1m'%s'\e[m but expected \e[1m'%s'\e[m",
+             got, expected);
+}
+
 Token *next_token()
 {
     static Token token;
     static char sval[128];
 
     int ch;
-    while ((ch = getchar()) != EOF) {
+    while ((ch = get_char()) != EOF) {
         if (isspace(ch)) continue;
+
+        token.line_row = line_row;
+        token.line_column = line_column;
 
         if (isalpha(ch) || ch == '.' || ch == '_') {  // read an identifier
             int i = 0;
             sval[i++] = ch;
-            while (isalnum(ch = getchar())) sval[i++] = ch;
-            ungetc(ch, stdin);
+            while (isalnum(ch = get_char())) sval[i++] = ch;
+            unget_char(ch);
             sval[i++] = '\0';
 
             token.kind = T_IDENT;
@@ -54,9 +140,9 @@ Token *next_token()
             token.kind = T_INTEGER;
 
             if (ch == '0') {
-                ch = getchar();
+                ch = get_char();
                 if (ch != 'x') {  // just 0
-                    ungetc(ch, stdin);
+                    unget_char(ch);
                     token.ival = 0;
                     return &token;
                 }
@@ -64,7 +150,7 @@ Token *next_token()
                 // hex number
                 int ival = 0;
                 while (1) {
-                    ch = getchar();
+                    ch = get_char();
                     if (isdigit(ch))
                         ival = ival * 16 + ch - '0';
                     else if ('A' <= ch && ch <= 'F')
@@ -74,21 +160,21 @@ Token *next_token()
                     else
                         break;
                 }
-                ungetc(ch, stdin);
+                unget_char(ch);
                 token.ival = ival;
                 return &token;
             }
 
             // decimal number
             int ival = ch - '0';
-            while (isdigit(ch = getchar())) ival = ival * 10 + ch - '0';
-            ungetc(ch, stdin);
+            while (isdigit(ch = get_char())) ival = ival * 10 + ch - '0';
+            unget_char(ch);
             token.ival = ival;
             return &token;
         }
 
         if (ch == '#' || ch == '/') {  // skip comment until endline
-            while ((ch = getchar()) != '\n')
+            while ((ch = get_char()) != '\n')
                 ;
             continue;
         }
@@ -113,7 +199,8 @@ Token *next_token()
             token.kind = T_COLON;
             break;
         default:
-            assert(0);
+            failwith(line_row, line_column - 1,
+                     "Unrecognized character: \e[1m'%c'\e[m", ch);
         }
 
         return &token;
@@ -136,7 +223,10 @@ Token *pop_token()
 Token *expect_token(int kind)
 {
     Token *token = pop_token();
-    assert(token != NULL && token->kind == kind);
+    if (token == NULL) failwith(line_row, line_column, "Unexpected EOF");
+    if (token->kind != kind)
+        failwith_unexpected_token(token->line_row, token->line_column,
+                                  token2str(token), tokenkind2str(kind));
 
     return token;
 }
@@ -169,10 +259,13 @@ char *expect_ident()
 
 int expect_reg()
 {
-    char *sval = expect_ident();
+    Token *token = expect_token(T_IDENT);
+    char *sval = token->sval;
     if (streql(sval, "SP")) return 7;  // R7
 
-    assert(sval[0] == 'R' && '0' <= sval[1] && sval[1] < '8');
+    if (!(sval[0] == 'R' && '0' <= sval[1] && sval[1] < '8'))
+        failwith_unexpected_token(token->line_row, token->line_column,
+                                  token2str(token), "R[0-7]");
     return sval[1] - '0';
 }
 
@@ -508,7 +601,8 @@ int main()
         int emit_index = (int)(pair->second);
 
         KeyValue *kv = map_lookup(labels, label_name);
-        assert(kv != NULL);
+        if (kv == NULL)
+            failwith(-1, -1, "Undeclared label: \e[1m%s\e[m", label_name);
         int d = (int)(kv->value) - emit_index - 1;
         vector_set(emits, emit_index,
                    format("%s %d", (char *)vector_get(emits, emit_index), d));

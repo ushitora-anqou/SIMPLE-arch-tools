@@ -28,7 +28,4 @@ Word *getIM();
 int getIMSize();
 void assemble();
 
-// utility.c
-// int streql(const char *lhs, const char *rhs);
-
 #endif

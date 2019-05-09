@@ -14,8 +14,8 @@ assembler: debugger.h assembler.c asm.c
 encoder: encoder.c
 	gcc $(CFLAGS) -o $@ $^
 
-macro: macro.c
-	gcc $(CFLAGS) -o $@ $^
+macro: utility.h macro.c utility.c
+	gcc $(CFLAGS) -o $@ macro.c utility.c
 
 test: test.sh emulator assembler encoder macro
 	./test.sh
