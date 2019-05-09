@@ -21,6 +21,6 @@ test: test.sh emulator assembler encoder macro
 	./test.sh
 
 clean:
-	rm -rf emulator assembler encoder macro
+	rm -rf emulator assembler encoder macro debugger
 
 .PHONY: all test clean
