@@ -38,6 +38,12 @@ void assert_byte(int n)
     assert(-128 <= n && n <= 255);
 }
 
+void read_reg(int *lhs)
+{
+    assert(fscanf(fh, " R%d", lhs) == 1);
+    assert_reg(*lhs);
+}
+
 void read_reg_imm(int *lhs, int *rhs)
 {
     assert(fscanf(fh, " R%d , %d", lhs, rhs) == 2);
@@ -105,6 +111,11 @@ void assemble()
             read_reg_reg(&rd, &rs);
             put23344(3, rs, rd, 6, 0);
         }
+        else if (streql(op, "ADDI")) {
+            int rd, d;
+            read_reg_imm(&rd, &d);
+            put23344(3, 0, rd, 7, d);
+        }
         else if (streql(op, "SLL")) {
             int rd, d;
             read_reg_imm(&rd, &d);
@@ -124,6 +135,11 @@ void assemble()
             int rd, d;
             read_reg_imm(&rd, &d);
             put23344(3, 0, rd, 11, d);
+        }
+        else if (streql(op, "CMPI")) {
+            int rd, d;
+            read_reg_imm(&rd, &d);
+            put23344(3, 0, rd, 14, d);
         }
         else if (streql(op, "LD")) {
             int ra, rb, d;
@@ -176,6 +192,16 @@ void assemble()
         else if (streql(op, "HLT")) {
             put23344(3, 0, 0, 15, 0);
         }
+        else if (streql(op, "IN")) {
+            int rd;
+            read_reg(&rd);
+            put23344(3, 0, rd, 12, 0);
+        }
+        else if (streql(op, "OUT")) {
+            int rs;
+            read_reg(&rs);
+            put23344(3, rs, 0, 13, 0);
+        }
         else {
             assert(0);
         }
@@ -190,4 +216,9 @@ void initialize_asm(FILE *srcfh)
 Word *getIM()
 {
     return im;
+}
+
+int getIMSize()
+{
+    return nim;
 }

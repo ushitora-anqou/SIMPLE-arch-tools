@@ -207,6 +207,18 @@ BNE 1
 LI  R0, 0
 HLT" 0
 
+test_assembler "
+LI   R0, 1
+ADDI R0, 5
+HLT" 6
+
+test_assembler "
+LI   R0, 1
+CMPI R0, 2
+BE   1
+LI   R0, 0
+HLT" 0
+
 test_assembler_in_mif_format(){
     res=$(echo "$1" | ./assembler -mif)
     diff -bB <(echo "$res") <(echo "$2") || \
@@ -379,5 +391,15 @@ sub:
 main:
     CALL sub
     HLT" 30
+
+test_macro "
+    MOV R0, 10
+    ADD R0, 2
+    CMP R0, 12
+    JE  exit
+    MOV R0, 0
+exit:
+    HLT
+" 12
 
 echo "ok"

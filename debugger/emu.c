@@ -51,6 +51,23 @@ uint32_t max(uint32_t lhs, uint32_t rhs)
     return lhs > rhs ? lhs : rhs;
 }
 
+Word do_sub(Word lhs, Word rhs)
+{
+    // need 0xffff mask because of integer promotion
+    int pl = max(clz(lhs), clz((-rhs) & 0xffff));
+    uint32_t uv = ((uint32_t)(lhs - rhs)) & 0xffff;
+    int c = pl < clz(uv);
+
+    // check overflow
+    int16_t a = lhs, b = rhs;
+    int16_t sv = a - b;
+    int v = 0;
+    if ((a >= 0 && b < 0 && sv < 0) || (a < 0 && b >= 0 && sv >= 0)) v = 1;
+
+    set_cflag(sv, c, v);
+    return uv;
+}
+
 int stepEmu()
 {
     Word code = *p;
@@ -148,22 +165,9 @@ int stepEmu()
             set_cflag(reg[rd], c, v);
         } break;
 
-        case 0x01: {  // SUB
-            // need 0xffff mask because of integer promotion
-            int pl = max(clz(reg[rd]), clz((-reg[rs]) & 0xffff));
-            uint32_t uv = ((uint32_t)(reg[rd] - reg[rs])) & 0xffff;
-            int c = pl < clz(uv);
-
-            // check overflow
-            int16_t a = reg[rd], b = reg[rs];
-            int16_t sv = a - b;
-            int v = 0;
-            if ((a >= 0 && b < 0 && sv < 0) || (a < 0 && b >= 0 && sv >= 0))
-                v = 1;
-
-            set_cflag(sv, c, v);
-            reg[rd] = uv;
-        } break;
+        case 0x01:  // SUB
+            reg[rd] = do_sub(reg[rd], reg[rs]);
+            break;
 
         case 0x02:  // AND
             reg[rd] = reg[rd] & reg[rs];
@@ -180,28 +184,17 @@ int stepEmu()
             set_cflag(reg[rd], 0, 0);
             break;
 
-        case 0x05: {  // CMP
-            // need 0xffff mask because of integer promotion
-            int pl = max(clz(reg[rd]), clz((-reg[rs]) & 0xffff));
-            uint32_t uv = ((uint32_t)(reg[rd] - reg[rs])) & 0xffff;
-            int c = pl < clz(uv);
-
-            // check overflow
-            int16_t a = reg[rd], b = reg[rs];
-            int16_t sv = a - b;
-            int v = 0;
-            if ((a >= 0 && b < 0 && sv < 0) || (a < 0 && b >= 0 && sv >= 0))
-                v = 1;
-
-            set_cflag(sv, c, v);
-        } break;
+        case 0x05:  // CMP
+            do_sub(reg[rd], reg[rs]);
+            break;
 
         case 0x06:  // MOV
             reg[rd] = reg[rs];
             set_cflag(reg[rd], 0, 0);
             break;
 
-        case 0x07:  // reserved
+        case 0x07:  // ADDI
+            reg[rd] = reg[rd] + d;
             break;
 
         case 0x08:  // SLL
@@ -221,6 +214,14 @@ int stepEmu()
             reg[rd] =
                 (reg[rd] >> d) | (minus ? (((1 << d) - 1) << (16 - d)) : 0);
         } break;
+
+        case 0x0d:  // OUT
+            printf("output: %d\n", reg[rs]);
+            break;
+
+        case 0x0e:  // CMPI
+            do_sub(reg[rd], d);
+            break;
 
         case 0x0f:  // HLT
             return 1;

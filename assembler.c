@@ -139,6 +139,11 @@ int main(int argc, char **argv)
             read_reg_reg(&rd, &rs);
             put23344(3, rs, rd, 6, 0);
         }
+        else if (streql(op, "ADDI")) {
+            int rd, d;
+            read_reg_imm(&rd, &d);
+            put23344(3, 0, rd, 7, d);
+        }
         else if (streql(op, "SLL")) {
             int rd, d;
             read_reg_imm(&rd, &d);
@@ -158,6 +163,11 @@ int main(int argc, char **argv)
             int rd, d;
             read_reg_imm(&rd, &d);
             put23344(3, 0, rd, 11, d);
+        }
+        else if (streql(op, "CMPI")) {
+            int rd, d;
+            read_reg_imm(&rd, &d);
+            put23344(3, 0, rd, 14, d);
         }
         else if (streql(op, "LD")) {
             int ra, rb, d;

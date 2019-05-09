@@ -25,6 +25,10 @@ int stepEmu();
 // asm.c
 void initialize_asm(FILE *srcfh);
 Word *getIM();
+int getIMSize();
 void assemble();
+
+// utility.c
+// int streql(const char *lhs, const char *rhs);
 
 #endif

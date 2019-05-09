@@ -388,9 +388,42 @@ int main()
             continue;
         }
 
+        if (streql(ident, "ADD")) {
+            int dst_reg = expect_reg();
+            expect_token(T_COMMA);
+
+            if (match_integer()) {
+                // ADD Rn, imm -> ADDI Rn, imm
+                int src_imm = expect_integer();
+                emit("ADDI R%d, %d", dst_reg, src_imm);
+                continue;
+            }
+
+            // ADD Rn, Rm
+            int src_reg = expect_reg();
+            emit("ADD R%d, R%d", dst_reg, src_reg);
+            continue;
+        }
+
+        if (streql(ident, "CMP")) {
+            int dst_reg = expect_reg();
+            expect_token(T_COMMA);
+
+            if (match_integer()) {
+                // CMP Rn, imm -> CMPI Rn, imm
+                int src_imm = expect_integer();
+                emit("CMPI R%d, %d", dst_reg, src_imm);
+                continue;
+            }
+
+            // CMP Rn, Rm
+            int src_reg = expect_reg();
+            emit("CMP R%d, R%d", dst_reg, src_reg);
+            continue;
+        }
+
         {
-            char *simple_ops_reg_reg[] = {"ADD", "SUB", "AND",
-                                          "OR",  "XOR", "CMP"};
+            char *simple_ops_reg_reg[] = {"SUB", "AND", "OR", "XOR"};
             int i = 0, size = sizeof(simple_ops_reg_reg) / sizeof(char *);
             for (; i < size; i++)
                 if (streql(ident, simple_ops_reg_reg[i])) break;
