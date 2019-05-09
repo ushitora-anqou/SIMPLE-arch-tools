@@ -1,7 +1,7 @@
 #!/usr/bin/bash
 
-if [ ! -e debugger/debugger ]; then
-    echo '`make` in debugger'
+if [ ! -e debugger ]; then
+    echo '`make`'
     exit 1
 fi
 if [ $# -ne 1 ]; then
@@ -11,4 +11,4 @@ fi
 
 tmpfilename=$(mktemp)
 cat $1 | ./macro > $tmpfilename
-debugger/debugger $tmpfilename
+./debugger $tmpfilename

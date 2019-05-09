@@ -61,10 +61,11 @@ test_emulator "c[0 0 2] c[0 1 2] a[1 0 5 0] d[2 1] c[0 0 0] a[0 0 15 0]" 2
 # reg[0] <- 1; reg[1] <- 1; CMP(reg[0], reg[1]); BNE 1; reg[0] <- 0; HLT
 test_emulator "c[0 0 1] c[0 1 1] a[1 0 5 0] d[3 1] c[0 0 0] a[0 0 15 0]" 0
 
-# reg[1] <- 0; LD(reg[0], 0(reg[1])); HLT"
-test_emulator "c[0 1 0] b[0 0 1 0] a[0 0 15 0]" 0
-# reg[1] <- 0; LD(reg[0], 1(reg[1])); HLT"
-test_emulator "c[0 1 0] b[0 0 1 1] a[0 0 15 0]" 1
+## These tests assume that the target machine has von Neumann architecture.
+## reg[1] <- 0; LD(reg[0], 0(reg[1])); HLT"
+#test_emulator "c[0 1 0] b[0 0 1 0] a[0 0 15 0]" 0
+## reg[1] <- 0; LD(reg[0], 1(reg[1])); HLT"
+#test_emulator "c[0 1 0] b[0 0 1 1] a[0 0 15 0]" 1
 # reg[1] <- 100; ST(reg[1], 0(reg[1])); LD(reg[0], 0(reg[1])); HLT"
 test_emulator "c[0 1 100] b[1 1 1 0] b[0 0 1 0] a[0 0 15 0]" 100
 
@@ -141,10 +142,11 @@ LI  R1, 0
 LD  R0, 0(R1)
 HLT" 0
 
-test_assembler "
-LI  R1, 0
-LD  R0, 1(R1)
-HLT" 1
+# This test assumes that the target machine has von Neumann architecture.
+#test_assembler "
+#LI  R1, 0
+#LD  R0, 1(R1)
+#HLT" 1
 
 test_assembler "
 LI  R1, 100
@@ -375,22 +377,23 @@ loop:
     JLE loop
     HLT" 11
 
-test_macro "
-    JMP main
-sub2:# hoge
-    MOV R0, 20
-    RET
-sub:
-    MOV R2, R6
-    CALL sub2
-    MOV R6, R2  # comment
-    # comcom
-    MOV R1, 10
-    ADD R0, R1
-    RET
-main:
-    CALL sub
-    HLT" 30
+# This test assumes that the target processor has CALL/RET insts.
+#test_macro "
+#    JMP main
+#sub2:# hoge
+#    MOV R0, 20
+#    RET
+#sub:
+#    MOV R2, R6
+#    CALL sub2
+#    MOV R6, R2  # comment
+#    # comcom
+#    MOV R1, 10
+#    ADD R0, R1
+#    RET
+#main:
+#    CALL sub
+#    HLT" 30
 
 test_macro "
     MOV R0, 10
