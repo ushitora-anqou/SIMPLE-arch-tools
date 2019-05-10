@@ -420,4 +420,21 @@ test_macro "
     HLT
 " 2
 
+test_macro "
+    define hoge 3
+    R0 = hoge
+    HLT
+" 3
+
+test_macro "
+    define sp R7
+    define val 5
+    sp = 10
+
+    R0 = val
+    [sp + 10] = R0
+    R0 = [sp + 10]
+    HLT
+" 5
+
 echo "ok"

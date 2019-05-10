@@ -58,6 +58,12 @@ void *vector_set(Vector *vec, int i, void *item)
     return item;
 }
 
+void vector_push_back_vector(Vector *vec, Vector *src)
+{
+    for (int i = 0; i < vector_size(src); i++)
+        vector_push_back(vec, vector_get(src, i));
+}
+
 char *vformat(const char *src, va_list ap)
 {
     char buf[512];  // TODO: enough length?
@@ -173,6 +179,7 @@ struct Token {
         T_COLON,
         T_REGISTER,
         T_NEWLINE,
+        T_EQ,
         K_DEFINE,
     } kind;
 
@@ -181,6 +188,20 @@ struct Token {
         int ival;
     };
 };
+
+Token *new_token(int kind)
+{
+    Token *token = (Token *)malloc(sizeof(Token));
+    token->kind = kind;
+    return token;
+}
+
+Token *new_ident(char *sval)
+{
+    Token *token = new_token(T_IDENT);
+    token->sval = sval;
+    return token;
+}
 
 const char *token2str(Token *token)
 {
@@ -204,11 +225,13 @@ const char *token2str(Token *token)
         return "-";
     case T_COLON:
         return ":";
-    case T_NEWLINE:
-        return "newline";
     case T_REGISTER:
         // TODO: returned pointer is not malloc-ed.
         sprintf(buf, "R%d", token->ival);
+    case T_NEWLINE:
+        return "newline";
+    case T_EQ:
+        return "=";
     case K_DEFINE:
         return "define";
     default:
@@ -239,6 +262,8 @@ const char *tokenkind2str(int kind)
         return "register";
     case T_NEWLINE:
         return "newline";
+    case T_EQ:
+        return "equal";
     case K_DEFINE:
         return "keyword define";
     default:
@@ -364,6 +389,9 @@ Token *next_token()
         case ':':
             token->kind = T_COLON;
             break;
+        case '=':
+            token->kind = T_EQ;
+            break;
         default:
             failwith(line_row, line_column - 1,
                      "Unrecognized character: \e[1m'%c'\e[m", ch);
@@ -468,9 +496,11 @@ int emitted_size()
 
 void preprocess()
 {
-    Vector *dst = new_vector();
-    Map *macros = new_map();
+    Vector *dst = NULL;
 
+    // Phase 1: define and expand macros
+    dst = new_vector();
+    Map *macros = new_map();
     while (peek_token() != NULL) {
         if (pop_token_if(K_DEFINE)) {
             char *name = expect_ident();
@@ -479,18 +509,16 @@ void preprocess()
                 vector_push_back(code, pop_token());
             if (peek_token() != NULL) pop_token();  // pop T_NEWLINE
             map_insert(macros, name, code);
+            continue;
         }
 
-        if (pop_token_if(T_NEWLINE)) continue;
-
+        // maybe macro expansion
         if (match_token(T_IDENT)) {
             KeyValue *kv = map_lookup(macros, peek_token()->sval);
             if (kv != NULL) {
                 pop_token();  // discard the macro identifier
                 Vector *code = (Vector *)(kv->value);
-                int size = vector_size(code);
-                for (int i = 0; i < size; i++)
-                    vector_push_back(dst, vector_get(code, i));
+                vector_push_back_vector(dst, code);
                 continue;
             }
         }
@@ -499,6 +527,30 @@ void preprocess()
     }
 
     // set new tokens
+    input_tokens = dst;
+    input_tokens_npos = 0;
+
+    // Phase 2: expand syntax sugars
+    dst = new_vector();
+    while (peek_token() != NULL) {
+        if (match_token(T_REGISTER) || match_token(T_LBRACKET)) {
+            Vector *lhs = new_vector(), *rhs = new_vector();
+            while (!match_token(T_EQ)) vector_push_back(lhs, pop_token());
+            expect_token(T_EQ);
+            while (!match_token(T_NEWLINE)) vector_push_back(rhs, pop_token());
+            expect_token(T_NEWLINE);
+
+            vector_push_back(dst, new_ident("MOV"));
+            vector_push_back_vector(dst, lhs);
+            vector_push_back(dst, new_token(T_COMMA));
+            vector_push_back_vector(dst, rhs);
+
+            continue;
+        }
+
+        while (!pop_token_if(T_NEWLINE)) vector_push_back(dst, pop_token());
+    }
+
     input_tokens = dst;
     input_tokens_npos = 0;
 }
