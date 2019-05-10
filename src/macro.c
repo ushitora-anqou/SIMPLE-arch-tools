@@ -517,12 +517,19 @@ char *expect_ident()
     return token->sval;
 }
 
-int expect_integer()
+int expect_integer(int min, int max)
 {
     int mul = 1;
     if (pop_token_if(T_MINUS))  //
         mul = -1;
-    return mul * expect_token(T_INTEGER)->ival;
+    Token *token = expect_token(T_INTEGER);
+    int num = mul * token->ival;
+
+    if (num < min || max < num)
+        failwith_unexpected_token(token->line_row, token->line_column,
+                                  format("%d", num),
+                                  format("number in [%d, %d]", min, max));
+    return num;
 }
 
 int match_integer()
@@ -537,9 +544,9 @@ void expect_mem(int *base_reg, int *disp)
     *base_reg = expect_token(T_REGISTER)->ival;
     *disp = 0;
     if (pop_token_if(T_PLUS))
-        *disp = expect_integer();
+        *disp = expect_integer(-128, 127);
     else if (match_token(T_MINUS))
-        *disp = expect_integer();
+        *disp = expect_integer(-128, 127);
     expect_token(T_RBRACKET);
 }
 
@@ -680,7 +687,7 @@ int main()
 
             if (match_integer()) {
                 // MOV Rn, imm
-                int src_imm = expect_integer();
+                int src_imm = expect_integer(-128, 127);
                 emit("LI R%d, %d", dst_reg, src_imm);
                 continue;
             }
@@ -705,7 +712,7 @@ int main()
 
             if (match_integer()) {
                 // ADD Rn, imm -> ADDI Rn, imm
-                int src_imm = expect_integer();
+                int src_imm = expect_integer(-8, 7);
                 emit("ADDI R%d, %d", dst_reg, src_imm);
                 continue;
             }
@@ -722,7 +729,7 @@ int main()
 
             if (match_integer()) {
                 // CMP Rn, imm -> CMPI Rn, imm
-                int src_imm = expect_integer();
+                int src_imm = expect_integer(-8, 7);
                 emit("CMPI R%d, %d", dst_reg, src_imm);
                 continue;
             }
@@ -757,7 +764,7 @@ int main()
                 char *op = simple_ops_reg_imm[i];
                 int dst_reg = expect_token(T_REGISTER)->ival;
                 expect_token(T_COMMA);
-                int src_imm = expect_integer();
+                int src_imm = expect_integer(0, 15);
                 emit("%s R%d, %d", op, dst_reg, src_imm);
                 continue;
             }
@@ -771,7 +778,7 @@ int main()
                 if (streql(ident, jump_ops_src[i])) break;
             if (i < size) {
                 if (match_integer()) {
-                    int d = expect_integer();
+                    int d = expect_integer(0, 15);
                     emit("%s %d", jump_ops_dst[i], d);
                     continue;
                 }
