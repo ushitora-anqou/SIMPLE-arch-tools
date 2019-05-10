@@ -6,5 +6,4 @@ Development tools for SIMPLE architecture.
 
 ## Usage?
 
-Ask [anqou](https://twitter.com/ushitora_anqou).
-
+Read [usage.md](https://github.com/ushitora-anqou/SIMPLE-arch-tools/blob/master/usage.md).
