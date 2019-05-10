@@ -147,6 +147,7 @@ int stepEmu()
     case 0x03: {
         int rs = (code >> 11) & 0x07, rd = (code >> 8) & 0x07,
             op3 = (code >> 4) & 0x0f, d = code & 0x0f;
+        int8_t d_signed = (code & 0x0f) | ((code & 0x08) != 0 ? 0xf0 : 0);
 
         switch (op3) {
         case 0x00: {  // ADD
@@ -194,7 +195,7 @@ int stepEmu()
             break;
 
         case 0x07:  // ADDI
-            reg[rd] = reg[rd] + d;
+            reg[rd] = reg[rd] + d_signed;
             break;
 
         case 0x08:  // SLL
@@ -220,7 +221,7 @@ int stepEmu()
             break;
 
         case 0x0e:  // CMPI
-            do_sub(reg[rd], d);
+            do_sub(reg[rd], d_signed);
             break;
 
         case 0x0f:  // HLT
