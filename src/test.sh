@@ -467,7 +467,54 @@ test_macro "
     HLT
 " 1
 
+test_macro "
+    define sp R7
+    define val 5
+    define val2 1
+    sp = val2
 
+    R0 = val
+    if R0 = 5 then goto exit
+    R0 += val2
+    R0 -= R0
+    R0 = 1
+    R0 <<= 1
+    R0 >>= 1
 
+    [sp + val2] = R0
+    R0 = [sp + val2]
+exit:
+    HLT
+" 5
+
+test_macro "
+    define MAX 55
+
+    R0 = 2
+    R1 = 1
+    R4 = MAX
+loop:
+    R3 = R0
+    R0 = R1
+    R1 += R3
+    if R0 <= R4 then goto loop
+exit:
+    HLT
+" 76
+
+test_macro "
+    define MAX 76
+
+    R0 = 2
+    R1 = 1
+    R4 = MAX
+loop:
+    R3 = R0
+    R0 = R1
+    R1 += R3
+    if R0 != R4 then goto loop
+exit:
+    HLT
+" 76
 
 echo "ok"

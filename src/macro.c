@@ -180,11 +180,17 @@ struct Token {
         T_REGISTER,
         T_NEWLINE,
         T_EQ,
+        T_NEQ,
+        T_LT,
+        T_LTEQ,
         T_PLUSEQ,
         T_MINUSEQ,
         T_LTLTEQ,
         T_GTGTEQ,
         K_DEFINE,
+        K_IF,
+        K_THEN,
+        K_GOTO,
     } kind;
 
     union {
@@ -227,6 +233,12 @@ const char *token2str(Token *token)
         return "+";
     case T_PLUSEQ:
         return "+=";
+    case T_NEQ:
+        return "!=";
+    case T_LT:
+        return "<";
+    case T_LTEQ:
+        return "<=";
     case T_MINUSEQ:
         return "-=";
     case T_LTLTEQ:
@@ -246,6 +258,12 @@ const char *token2str(Token *token)
         return "=";
     case K_DEFINE:
         return "define";
+    case K_IF:
+        return "if";
+    case K_THEN:
+        return "then";
+    case K_GOTO:
+        return "goto";
     default:
         assert(0);
     }
@@ -276,8 +294,28 @@ const char *tokenkind2str(int kind)
         return "newline";
     case T_EQ:
         return "equal";
+    case T_PLUSEQ:
+        return "+=";
+    case T_NEQ:
+        return "!=";
+    case T_LT:
+        return "<";
+    case T_LTEQ:
+        return "<=";
+    case T_MINUSEQ:
+        return "-=";
+    case T_LTLTEQ:
+        return "<<=";
+    case T_GTGTEQ:
+        return ">>=";
     case K_DEFINE:
         return "keyword define";
+    case K_IF:
+        return "keyword if";
+    case K_THEN:
+        return "keyword then";
+    case K_GOTO:
+        return "keyword goto";
     default:
         assert(0);
     }
@@ -331,6 +369,18 @@ Token *next_token()
 
             if (streql(sval, "define")) {
                 token->kind = K_DEFINE;
+                return token;
+            }
+            if (streql(sval, "if")) {
+                token->kind = K_IF;
+                return token;
+            }
+            if (streql(sval, "then")) {
+                token->kind = K_THEN;
+                return token;
+            }
+            if (streql(sval, "goto")) {
+                token->kind = K_GOTO;
                 return token;
             }
 
@@ -427,8 +477,12 @@ Token *next_token()
                 }
                 goto unrecognized_character;
             }
-            // token->kind = T_LT;
-            goto unrecognized_character;
+            if (ch == '=') {
+                token->kind = T_LTEQ;
+                break;
+            }
+            unget_char(ch);
+            token->kind = T_LT;
         } break;
 
         case '>': {
@@ -441,13 +495,21 @@ Token *next_token()
                 }
                 goto unrecognized_character;
             }
-            // token->kind = T_GT;
             goto unrecognized_character;
         } break;
 
         case ':':
             token->kind = T_COLON;
             break;
+
+        case '!':
+            ch = get_char();
+            if (ch == '=') {
+                token->kind = T_NEQ;
+                break;
+            }
+            unget_char(ch);
+            goto unrecognized_character;
 
         case '=':
             token->kind = T_EQ;
@@ -646,6 +708,46 @@ void preprocess()
             vector_push_back_vector(dst, lhs);
             vector_push_back(dst, new_token(T_COMMA));
             vector_push_back_vector(dst, rhs);
+
+            continue;
+        }
+
+        if (pop_token_if(K_IF)) {
+            Token *lhs = pop_token(), *op = pop_token(), *rhs = pop_token();
+            expect_token(K_THEN);
+            expect_token(K_GOTO);
+            Token *label = expect_token(T_IDENT);  // label
+
+            if (lhs->kind != T_REGISTER && lhs->kind != T_INTEGER)
+                failwith_unexpected_token(lhs->line_row, lhs->line_column,
+                                          token2str(lhs),
+                                          "register or integer");
+            if (rhs->kind != T_REGISTER && rhs->kind != T_INTEGER)
+                failwith_unexpected_token(rhs->line_row, rhs->line_column,
+                                          token2str(rhs),
+                                          "register or integer");
+            vector_push_back(dst, new_ident("CMP"));
+            vector_push_back(dst, lhs);
+            vector_push_back(dst, new_token(T_COMMA));
+            vector_push_back(dst, rhs);
+
+            switch (op->kind) {
+            case T_EQ:
+                vector_push_back(dst, new_ident("JE"));
+                break;
+            case T_NEQ:
+                vector_push_back(dst, new_ident("JNE"));
+                break;
+            case T_LT:
+                vector_push_back(dst, new_ident("JL"));
+                break;
+            case T_LTEQ:
+                vector_push_back(dst, new_ident("JLE"));
+                break;
+            default:
+                assert(0);
+            }
+            vector_push_back(dst, label);
 
             continue;
         }
