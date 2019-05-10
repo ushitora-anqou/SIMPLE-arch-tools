@@ -14,9 +14,13 @@
 
 ## 基本的な使い方
 
-`cat examples/fiblt55.s | ./macro | ./assembler -mif`
+`cat ../examples/fiblt55.s | ./macro | ./assembler -mif`
 
 パイプのところを1段ずつ外して出力を確かめるといいさ。
+
+デバッガを直接使うのは手間なので次のようにしてください： `./aqdb.sh ../examples/fiblt55.s`
+
+なおデバッガは`./macro`を通した結果で表示されますが、仕様です。改良募集。
 
 ## `macro` で使える命令
 
