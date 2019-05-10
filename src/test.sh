@@ -474,7 +474,7 @@ test_macro "
     sp = val2
 
     R0 = val
-    if R0 = 5 then goto exit
+    if R0 == 5 then goto exit
     R0 += val2
     R0 -= R0
     R0 = 1

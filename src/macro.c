@@ -180,6 +180,7 @@ struct Token {
         T_REGISTER,
         T_NEWLINE,
         T_EQ,
+        T_EQEQ,
         T_NEQ,
         T_LT,
         T_LTEQ,
@@ -256,6 +257,8 @@ const char *token2str(Token *token)
         return "newline";
     case T_EQ:
         return "=";
+    case T_EQEQ:
+        return "==";
     case K_DEFINE:
         return "define";
     case K_IF:
@@ -294,6 +297,8 @@ const char *tokenkind2str(int kind)
         return "newline";
     case T_EQ:
         return "equal";
+    case T_EQEQ:
+        return "==";
     case T_PLUSEQ:
         return "+=";
     case T_NEQ:
@@ -512,6 +517,12 @@ Token *next_token()
             goto unrecognized_character;
 
         case '=':
+            ch = get_char();
+            if (ch == '=') {
+                token->kind = T_EQEQ;
+                break;
+            }
+            unget_char(ch);
             token->kind = T_EQ;
             break;
 
@@ -732,7 +743,7 @@ void preprocess()
             vector_push_back(dst, rhs);
 
             switch (op->kind) {
-            case T_EQ:
+            case T_EQEQ:
                 vector_push_back(dst, new_ident("JE"));
                 break;
             case T_NEQ:
@@ -745,7 +756,8 @@ void preprocess()
                 vector_push_back(dst, new_ident("JLE"));
                 break;
             default:
-                assert(0);
+                failwith_unexpected_token(op->line_row, op->line_column,
+                                          token2str(op), "==, !=, <, <=");
             }
             vector_push_back(dst, label);
 
