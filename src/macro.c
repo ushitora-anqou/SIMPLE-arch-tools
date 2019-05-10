@@ -764,6 +764,13 @@ void preprocess()
             continue;
         }
 
+        if (pop_token_if(K_GOTO)) {
+            Token *label = expect_token(T_IDENT);  // label
+            vector_push_back(dst, new_ident("JMP"));
+            vector_push_back(dst, label);
+            continue;
+        }
+
         while (!pop_token_if(T_NEWLINE)) vector_push_back(dst, pop_token());
     }
 
