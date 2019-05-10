@@ -397,13 +397,27 @@ loop:
 #    HLT" 30
 
 test_macro "
-    MOV R0, 10
+    MOV R0, 1
     ADD R0, 2
-    CMP R0, 12
+    CMP R0, 3
     JE  exit
     MOV R0, 0
 exit:
     HLT
-" 12
+" 3
+
+test_macro "
+    define hoge 3
+    MOV R0, hoge
+    ADD R0, -2
+    HLT
+" 1
+
+test_macro "
+    define add_to_r0 ADD R0, 1
+    MOV R0, 1
+    add_to_r0
+    HLT
+" 2
 
 echo "ok"

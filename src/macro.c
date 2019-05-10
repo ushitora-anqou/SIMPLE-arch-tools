@@ -172,6 +172,8 @@ struct Token {
         T_MINUS,
         T_COLON,
         T_REGISTER,
+        T_NEWLINE,
+        K_DEFINE,
     } kind;
 
     union {
@@ -202,9 +204,13 @@ const char *token2str(Token *token)
         return "-";
     case T_COLON:
         return ":";
+    case T_NEWLINE:
+        return "newline";
     case T_REGISTER:
         // TODO: returned pointer is not malloc-ed.
         sprintf(buf, "R%d", token->ival);
+    case K_DEFINE:
+        return "define";
     default:
         assert(0);
     }
@@ -231,6 +237,10 @@ const char *tokenkind2str(int kind)
         return "colon";
     case T_REGISTER:
         return "register";
+    case T_NEWLINE:
+        return "newline";
+    case K_DEFINE:
+        return "keyword define";
     default:
         assert(0);
     }
@@ -251,10 +261,15 @@ Token *next_token()
 
     int ch;
     while ((ch = get_char()) != EOF) {
-        if (isspace(ch)) continue;
-
         token->line_row = line_row;
         token->line_column = line_column;
+
+        if (ch == '\n') {
+            token->kind = T_NEWLINE;
+            return token;
+        }
+
+        if (isspace(ch)) continue;
 
         if (isalpha(ch) || ch == '.' || ch == '_') {  // read an identifier
             int i = 0;
@@ -270,9 +285,17 @@ Token *next_token()
                 unget_char(ch);
             }
 
-            while (isalnum(ch = get_char())) sval[i++] = ch;
+            while ((ch = get_char()) != EOF) {
+                if (!(isalnum(ch) || ch == '_')) break;
+                sval[i++] = ch;
+            }
             unget_char(ch);
             sval[i++] = '\0';
+
+            if (streql(sval, "define")) {
+                token->kind = K_DEFINE;
+                return token;
+            }
 
             token->kind = T_IDENT;
             token->sval = new_string(sval);
@@ -446,9 +469,34 @@ int emitted_size()
 void preprocess()
 {
     Vector *dst = new_vector();
+    Map *macros = new_map();
 
-    Token *token;
-    while (token = pop_token()) vector_push_back(dst, token);
+    while (peek_token() != NULL) {
+        if (pop_token_if(K_DEFINE)) {
+            char *name = expect_ident();
+            Vector *code = new_vector();
+            while (peek_token() != NULL && !match_token(T_NEWLINE))
+                vector_push_back(code, pop_token());
+            if (peek_token() != NULL) pop_token();  // pop T_NEWLINE
+            map_insert(macros, name, code);
+        }
+
+        if (pop_token_if(T_NEWLINE)) continue;
+
+        if (match_token(T_IDENT)) {
+            KeyValue *kv = map_lookup(macros, peek_token()->sval);
+            if (kv != NULL) {
+                pop_token();  // discard the macro identifier
+                Vector *code = (Vector *)(kv->value);
+                int size = vector_size(code);
+                for (int i = 0; i < size; i++)
+                    vector_push_back(dst, vector_get(code, i));
+                continue;
+            }
+        }
+
+        vector_push_back(dst, pop_token());
+    }
 
     // set new tokens
     input_tokens = dst;
