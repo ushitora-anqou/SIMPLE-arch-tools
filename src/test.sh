@@ -437,4 +437,37 @@ test_macro "
     HLT
 " 5
 
+test_macro "
+    define sp R7
+    define val 5
+    define val2 10
+    sp = val2
+
+    R0 = val
+    [sp + val2] = R0
+    R0 = [sp + val2]
+    HLT
+" 5
+
+test_macro "
+    define sp R7
+    define val 5
+    define val2 1
+    sp = val2
+
+    R0 = val
+    R0 += val2
+    R0 -= R0
+    R0 = 1
+    R0 <<= 1
+    R0 >>= 1
+
+    [sp + val2] = R0
+    R0 = [sp + val2]
+    HLT
+" 1
+
+
+
+
 echo "ok"

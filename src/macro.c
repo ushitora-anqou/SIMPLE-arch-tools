@@ -180,6 +180,10 @@ struct Token {
         T_REGISTER,
         T_NEWLINE,
         T_EQ,
+        T_PLUSEQ,
+        T_MINUSEQ,
+        T_LTLTEQ,
+        T_GTGTEQ,
         K_DEFINE,
     } kind;
 
@@ -221,6 +225,14 @@ const char *token2str(Token *token)
         return "]";
     case T_PLUS:
         return "+";
+    case T_PLUSEQ:
+        return "+=";
+    case T_MINUSEQ:
+        return "-=";
+    case T_LTLTEQ:
+        return "<<=";
+    case T_GTGTEQ:
+        return ">>=";
     case T_MINUS:
         return "-";
     case T_COLON:
@@ -374,27 +386,75 @@ Token *next_token()
         case ',':
             token->kind = T_COMMA;
             break;
+
         case '[':
             token->kind = T_LBRACKET;
             break;
+
         case ']':
             token->kind = T_RBRACKET;
             break;
-        case '+':
+
+        case '+': {
+            ch = get_char();
+            if (ch == '=') {
+                token->kind = T_PLUSEQ;
+                break;
+            }
+
+            unget_char(ch);
             token->kind = T_PLUS;
-            break;
-        case '-':
+        } break;
+
+        case '-': {
+            ch = get_char();
+            if (ch == '=') {
+                token->kind = T_MINUSEQ;
+                break;
+            }
+
+            unget_char(ch);
             token->kind = T_MINUS;
-            break;
+        } break;
+
+        case '<': {
+            ch = get_char();
+            if (ch == '<') {
+                ch = get_char();
+                if (ch == '=') {
+                    token->kind = T_LTLTEQ;
+                    break;
+                }
+                goto unrecognized_character;
+            }
+            // token->kind = T_LT;
+            goto unrecognized_character;
+        } break;
+
+        case '>': {
+            ch = get_char();
+            if (ch == '>') {
+                ch = get_char();
+                if (ch == '=') {
+                    token->kind = T_GTGTEQ;
+                    break;
+                }
+                goto unrecognized_character;
+            }
+            // token->kind = T_GT;
+            goto unrecognized_character;
+        } break;
+
         case ':':
             token->kind = T_COLON;
             break;
+
         case '=':
             token->kind = T_EQ;
             break;
+
         default:
-            failwith(line_row, line_column - 1,
-                     "Unrecognized character: \e[1m'%c'\e[m", ch);
+            goto unrecognized_character;
         }
 
         return token;
@@ -402,6 +462,10 @@ Token *next_token()
 
     free(token);
     return NULL;
+
+unrecognized_character:
+    failwith(line_row, line_column - 1, "Unrecognized character: \e[1m'%c'\e[m",
+             ch);
 }
 
 static Vector *input_tokens;
@@ -535,12 +599,43 @@ void preprocess()
     while (peek_token() != NULL) {
         if (match_token(T_REGISTER) || match_token(T_LBRACKET)) {
             Vector *lhs = new_vector(), *rhs = new_vector();
-            while (!match_token(T_EQ)) vector_push_back(lhs, pop_token());
-            expect_token(T_EQ);
+
+            // left hand side
+            while (!(match_token(T_EQ) || match_token(T_PLUSEQ) ||
+                     match_token(T_MINUSEQ) || match_token(T_LTLTEQ) ||
+                     match_token(T_GTGTEQ)))
+                vector_push_back(lhs, pop_token());
+
+            // operator
+            Token *token = pop_token();
+            if (token == NULL)
+                failwith(line_row, line_column, "Unexpected EOF");
+            int op_kind = token->kind;
+
+            // right hand side
             while (!match_token(T_NEWLINE)) vector_push_back(rhs, pop_token());
             expect_token(T_NEWLINE);
 
-            vector_push_back(dst, new_ident("MOV"));
+            // generate code
+            switch (op_kind) {
+            case T_EQ:
+                vector_push_back(dst, new_ident("MOV"));
+                break;
+            case T_PLUSEQ:
+                vector_push_back(dst, new_ident("ADD"));
+                break;
+            case T_MINUSEQ:
+                vector_push_back(dst, new_ident("SUB"));
+                break;
+            case T_LTLTEQ:
+                vector_push_back(dst, new_ident("SLL"));
+                break;
+            case T_GTGTEQ:
+                vector_push_back(dst, new_ident("SRL"));
+                break;
+            default:
+                assert(0);
+            }
             vector_push_back_vector(dst, lhs);
             vector_push_back(dst, new_token(T_COMMA));
             vector_push_back_vector(dst, rhs);
