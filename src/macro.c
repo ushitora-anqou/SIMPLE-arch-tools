@@ -138,17 +138,25 @@ KeyValue *map_lookup(Map *map, const char *key)
     return NULL;
 }
 
-static int line_row = 1, line_column = 1, prev_line_column;
+static int line_row = 0, line_column = 0, prev_line_column;
+static char *read_line = NULL, *prev_read_line = NULL;
 
-int get_char()
+int get_char(void)
 {
-    line_column++;
+    if (read_line == NULL) {
+        read_line = (char *)malloc(256);
+        if (fgets(read_line, 256, stdin) == NULL) return EOF;
+        fprintf(stderr, read_line);
+    }
 
-    int ch = getchar();
+    int ch = read_line[line_column++];
     if (ch == '\n') {
-        prev_line_column = line_column;
         line_row++;
-        line_column = 1;
+        prev_line_column = line_column - 1;
+        line_column = 0;
+
+        prev_read_line = read_line;
+        read_line = NULL;
     }
 
     return ch;
@@ -160,8 +168,9 @@ void unget_char(int ch)
     if (ch == '\n') {
         line_row--;
         line_column = prev_line_column;
+
+        read_line = prev_read_line;
     }
-    ungetc(ch, stdin);
 }
 
 typedef struct Token Token;
@@ -253,6 +262,7 @@ const char *token2str(Token *token)
     case T_REGISTER:
         // TODO: returned pointer is not malloc-ed.
         sprintf(buf, "R%d", token->ival);
+        return buf;
     case T_NEWLINE:
         return "newline";
     case T_EQ:
@@ -329,7 +339,7 @@ const char *tokenkind2str(int kind)
 _Noreturn void failwith_unexpected_token(int line_row, int line_column,
                                          const char *got, const char *expected)
 {
-    failwith(line_row, line_column,
+    failwith(line_row + 1, line_column + 1,
              "Unexpected token: got \e[1m'%s'\e[m but expected \e[1m'%s'\e[m",
              got, expected);
 }
@@ -341,11 +351,17 @@ Token *next_token()
 
     int ch;
     while ((ch = get_char()) != EOF) {
+        // line_row and line_column represent the NEXT position to be read.
         token->line_row = line_row;
-        token->line_column = line_column;
+        token->line_column = line_column - 1;
 
         if (ch == '\n') {
             token->kind = T_NEWLINE;
+
+            // '\n' is the last letter of the previous line.
+            token->line_row--;
+            token->line_column = prev_line_column;
+
             return token;
         }
 
@@ -537,8 +553,8 @@ Token *next_token()
     return NULL;
 
 unrecognized_character:
-    failwith(line_row, line_column - 1, "Unrecognized character: \e[1m'%c'\e[m",
-             ch);
+    failwith(line_row + 1, line_column + 1,
+             "Unrecognized character: \e[1m'%c'\e[m", ch);
 }
 
 static Vector *input_tokens;
@@ -563,7 +579,8 @@ Token *peek_token()
 Token *expect_token(int kind)
 {
     Token *token = pop_token();
-    if (token == NULL) failwith(line_row, line_column, "Unexpected EOF");
+    if (token == NULL)
+        failwith(line_row + 1, line_column + 1, "Unexpected EOF");
     if (token->kind != kind)
         failwith_unexpected_token(token->line_row, token->line_column,
                                   token2str(token), tokenkind2str(kind));
@@ -689,7 +706,7 @@ void preprocess()
             // operator
             Token *token = pop_token();
             if (token == NULL)
-                failwith(line_row, line_column, "Unexpected EOF");
+                failwith(line_row + 1, line_column + 1, "Unexpected EOF");
             int op_kind = token->kind;
 
             // right hand side

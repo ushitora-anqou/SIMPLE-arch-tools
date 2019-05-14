@@ -200,7 +200,6 @@ BLE 1
 LI  R0, 0
 HLT" 255
 
-
 test_assembler "
 LI  R0, 1
 LI  R1, 1
