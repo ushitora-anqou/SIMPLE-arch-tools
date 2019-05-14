@@ -545,4 +545,16 @@ exit:
     HLT
 " 55
 
+test_macro "
+R0 = 5
+R1 = 6
+R0 &= R1
+HLT" 4
+
+test_macro "
+R0 = 5
+R1 = 6
+R0 |= R1
+HLT" 7
+
 echo "ok"

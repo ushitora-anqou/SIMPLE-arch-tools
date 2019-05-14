@@ -197,6 +197,8 @@ struct Token {
         T_MINUSEQ,
         T_LTLTEQ,
         T_GTGTEQ,
+        T_ANDEQ,
+        T_OREQ,
         K_DEFINE,
         K_IF,
         K_THEN,
@@ -293,6 +295,10 @@ const char *token2str(Token *token)
         return "<<=";
     case T_GTGTEQ:
         return ">>=";
+    case T_ANDEQ:
+        return "&=";
+    case T_OREQ:
+        return "|=";
     case T_MINUS:
         return "-";
     case T_COLON:
@@ -361,6 +367,10 @@ const char *tokenkind2str(int kind)
         return "<<=";
     case T_GTGTEQ:
         return ">>=";
+    case T_ANDEQ:
+        return "&=";
+    case T_OREQ:
+        return "|=";
     case K_DEFINE:
         return "keyword define";
     case K_IF:
@@ -582,6 +592,22 @@ Token *next_token()
             token->kind = T_EQ;
             break;
 
+        case '&':
+            ch = get_char();
+            if (ch == '=') {
+                token->kind = T_ANDEQ;
+                break;
+            }
+            goto unrecognized_character;
+
+        case '|':
+            ch = get_char();
+            if (ch == '=') {
+                token->kind = T_OREQ;
+                break;
+            }
+            goto unrecognized_character;
+
         default:
             goto unrecognized_character;
         }
@@ -736,7 +762,8 @@ void preprocess()
             // left hand side
             while (!(match_token(T_EQ) || match_token(T_PLUSEQ) ||
                      match_token(T_MINUSEQ) || match_token(T_LTLTEQ) ||
-                     match_token(T_GTGTEQ)))
+                     match_token(T_GTGTEQ) || match_token(T_ANDEQ) ||
+                     match_token(T_OREQ)))
                 vector_push_back(lhs, pop_token());
 
             // operator
@@ -765,6 +792,12 @@ void preprocess()
                 break;
             case T_GTGTEQ:
                 vector_push_back(dst, new_ident("SRL"));
+                break;
+            case T_ANDEQ:
+                vector_push_back(dst, new_ident("AND"));
+                break;
+            case T_OREQ:
+                vector_push_back(dst, new_ident("OR"));
                 break;
             default:
                 assert(0);
