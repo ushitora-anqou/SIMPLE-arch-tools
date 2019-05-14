@@ -64,9 +64,9 @@ int main(int argc, char **argv)
                 break;
             else if (prompt_buf[0] == 'b') {
                 int lineno;
-                if (sscanf(prompt_buf, " b%*s %d \n", &lineno) != 1) {
+                if (sscanf(prompt_buf, " b %d \n", &lineno) != 1) {
                     puts("ERROR: invalid format");
-                    puts("Usage: b[reak] <lineno>");
+                    puts("Usage: b <lineno>");
                     continue;
                 }
                 search = format("# %04d", lineno);
