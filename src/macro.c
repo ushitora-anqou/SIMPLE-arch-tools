@@ -138,7 +138,7 @@ KeyValue *map_lookup(Map *map, const char *key)
     return NULL;
 }
 
-static int line_row = 0, line_column = 0, prev_line_column;
+static int line_row = 0, line_column = 0, prev_max_line_column;
 static char *read_line = NULL, *prev_read_line = NULL;
 
 int get_char(void)
@@ -146,13 +146,12 @@ int get_char(void)
     if (read_line == NULL) {
         read_line = (char *)malloc(256);
         if (fgets(read_line, 256, stdin) == NULL) return EOF;
-        fprintf(stderr, read_line);
     }
 
     int ch = read_line[line_column++];
     if (ch == '\n') {
         line_row++;
-        prev_line_column = line_column - 1;
+        prev_max_line_column = line_column - 1;
         line_column = 0;
 
         prev_read_line = read_line;
@@ -167,7 +166,7 @@ void unget_char(int ch)
     line_column--;
     if (ch == '\n') {
         line_row--;
-        line_column = prev_line_column;
+        line_column = prev_max_line_column;
 
         read_line = prev_read_line;
     }
@@ -176,6 +175,7 @@ void unget_char(int ch)
 typedef struct Token Token;
 struct Token {
     int line_row, line_column;
+    char *read_line;
 
     enum {
         T_IDENT,
@@ -209,10 +209,26 @@ struct Token {
     };
 };
 
+Token *source_token_replaced = NULL;
+
+void set_source_token_replaced(Token *src)
+{
+    source_token_replaced = src;
+}
+
 Token *new_token(int kind)
 {
     Token *token = (Token *)malloc(sizeof(Token));
     token->kind = kind;
+    if (source_token_replaced) {
+        token->read_line = source_token_replaced->read_line;
+        token->line_row = source_token_replaced->line_row;
+        token->line_column = source_token_replaced->line_column;
+    }
+    else {
+        token->read_line = NULL;
+        token->line_row = token->line_column = 0;
+    }
     return token;
 }
 
@@ -221,6 +237,28 @@ Token *new_ident(char *sval)
     Token *token = new_token(T_IDENT);
     token->sval = sval;
     return token;
+}
+
+Token *dup_token(Token *token)
+{
+    Token *newtoken = (Token *)malloc(sizeof(Token));
+    memcpy(newtoken, token, sizeof(Token));
+    return newtoken;
+}
+
+void copy_tokens_updating_source(Vector *dst, Vector *src)
+{
+    assert(source_token_replaced != NULL);
+
+    for (int i = 0; i < vector_size(src); i++) {
+        Token *token = dup_token((Token *)vector_get(src, i));
+
+        token->read_line = source_token_replaced->read_line;
+        token->line_row = source_token_replaced->line_row;
+        token->line_column = source_token_replaced->line_column;
+
+        vector_push_back(dst, token);
+    }
 }
 
 const char *token2str(Token *token)
@@ -354,13 +392,15 @@ Token *next_token()
         // line_row and line_column represent the NEXT position to be read.
         token->line_row = line_row;
         token->line_column = line_column - 1;
+        token->read_line = read_line;
 
         if (ch == '\n') {
             token->kind = T_NEWLINE;
 
             // '\n' is the last letter of the previous line.
             token->line_row--;
-            token->line_column = prev_line_column;
+            token->line_column = prev_max_line_column;
+            token->read_line = prev_read_line;
 
             return token;
         }
@@ -563,7 +603,8 @@ static int input_tokens_npos;
 void read_all_tokens()
 {
     Token *token;
-    while (token = next_token()) vector_push_back(input_tokens, token);
+    while ((token = next_token()) != NULL)
+        vector_push_back(input_tokens, token);
 }
 
 Token *pop_token()
@@ -640,21 +681,6 @@ void expect_mem(int *base_reg, int *disp)
     expect_token(T_RBRACKET);
 }
 
-Vector *emits = NULL;
-
-void emit(char *str, ...)
-{
-    va_list args;
-    va_start(args, str);
-    vector_push_back(emits, vformat(str, args));
-    va_end(args);
-}
-
-int emitted_size()
-{
-    return vector_size(emits);
-}
-
 void preprocess()
 {
     Vector *dst = NULL;
@@ -675,11 +701,17 @@ void preprocess()
 
         // maybe macro expansion
         if (match_token(T_IDENT)) {
-            KeyValue *kv = map_lookup(macros, peek_token()->sval);
+            Token *macro_ident = peek_token();
+
+            KeyValue *kv = map_lookup(macros, macro_ident->sval);
             if (kv != NULL) {
                 pop_token();  // discard the macro identifier
                 Vector *code = (Vector *)(kv->value);
-                vector_push_back_vector(dst, code);
+
+                set_source_token_replaced(macro_ident);
+                copy_tokens_updating_source(dst, code);
+                set_source_token_replaced(NULL);
+
                 continue;
             }
         }
@@ -696,6 +728,10 @@ void preprocess()
     while (peek_token() != NULL) {
         if (match_token(T_REGISTER) || match_token(T_LBRACKET)) {
             Vector *lhs = new_vector(), *rhs = new_vector();
+
+            // set the source token to the left-most one
+            // TODO: more precise position?
+            set_source_token_replaced(peek_token());
 
             // left hand side
             while (!(match_token(T_EQ) || match_token(T_PLUSEQ) ||
@@ -737,6 +773,8 @@ void preprocess()
             vector_push_back(dst, new_token(T_COMMA));
             vector_push_back_vector(dst, rhs);
 
+            set_source_token_replaced(NULL);
+
             continue;
         }
 
@@ -754,6 +792,11 @@ void preprocess()
                 failwith_unexpected_token(rhs->line_row, rhs->line_column,
                                           token2str(rhs),
                                           "register or integer");
+
+            // set the source token to the left-most one
+            // TODO: more precise position?
+            set_source_token_replaced(lhs);
+
             vector_push_back(dst, new_ident("CMP"));
             vector_push_back(dst, lhs);
             vector_push_back(dst, new_token(T_COMMA));
@@ -778,13 +821,19 @@ void preprocess()
             }
             vector_push_back(dst, label);
 
+            set_source_token_replaced(NULL);
+
             continue;
         }
 
-        if (pop_token_if(K_GOTO)) {
+        if (match_token(K_GOTO)) {
+            set_source_token_replaced(pop_token());
+
             Token *label = expect_token(T_IDENT);  // label
             vector_push_back(dst, new_ident("JMP"));
             vector_push_back(dst, label);
+
+            set_source_token_replaced(NULL);
             continue;
         }
 
@@ -793,6 +842,33 @@ void preprocess()
 
     input_tokens = dst;
     input_tokens_npos = 0;
+}
+
+Vector *emits = NULL;
+
+typedef struct {
+    char *code, *comment;
+} EmitedLine;
+
+void emit(Token *src, char *str, ...)
+{
+    EmitedLine *line = (EmitedLine *)malloc(sizeof(EmitedLine));
+
+    va_list args;
+    va_start(args, str);
+    line->code = vformat(str, args);
+    va_end(args);
+
+    line->comment = format("# %04d %s", src->line_row, src->read_line);
+    if (line->comment[strlen(line->comment) - 1] == '\n')
+        line->comment[strlen(line->comment) - 1] = '\0';
+
+    vector_push_back(emits, line);
+}
+
+int emitted_size()
+{
+    return vector_size(emits);
 }
 
 int main()
@@ -807,7 +883,8 @@ int main()
     preprocess();
 
     while (peek_token() != NULL) {
-        char *ident = expect_ident();
+        Token *op_token = expect_token(T_IDENT);
+        char *ident = op_token->sval;
 
         if (streql(ident, "MOV")) {
             if (match_token(T_LBRACKET)) {
@@ -816,7 +893,7 @@ int main()
                 expect_token(T_COMMA);
                 int src_reg = expect_token(T_REGISTER)->ival;
 
-                emit("ST R%d, %d(R%d)", src_reg, disp, base_reg);
+                emit(op_token, "ST R%d, %d(R%d)", src_reg, disp, base_reg);
                 continue;
             }
 
@@ -826,7 +903,7 @@ int main()
             if (match_integer()) {
                 // MOV Rn, imm
                 int src_imm = expect_integer(-128, 127);
-                emit("LI R%d, %d", dst_reg, src_imm);
+                emit(op_token, "LI R%d, %d", dst_reg, src_imm);
                 continue;
             }
 
@@ -834,13 +911,13 @@ int main()
                 // MOV Rn, [Rbase (+ disp)?]
                 int base_reg, disp;
                 expect_mem(&base_reg, &disp);
-                emit("LD R%d, %d(R%d)", dst_reg, disp, base_reg);
+                emit(op_token, "LD R%d, %d(R%d)", dst_reg, disp, base_reg);
                 continue;
             }
 
             // MOV Rn, Rm
             int src_reg = expect_token(T_REGISTER)->ival;
-            emit("MOV R%d, R%d", dst_reg, src_reg);
+            emit(op_token, "MOV R%d, R%d", dst_reg, src_reg);
             continue;
         }
 
@@ -851,13 +928,13 @@ int main()
             if (match_integer()) {
                 // ADD Rn, imm -> ADDI Rn, imm
                 int src_imm = expect_integer(-8, 7);
-                emit("ADDI R%d, %d", dst_reg, src_imm);
+                emit(op_token, "ADDI R%d, %d", dst_reg, src_imm);
                 continue;
             }
 
             // ADD Rn, Rm
             int src_reg = expect_token(T_REGISTER)->ival;
-            emit("ADD R%d, R%d", dst_reg, src_reg);
+            emit(op_token, "ADD R%d, R%d", dst_reg, src_reg);
             continue;
         }
 
@@ -868,13 +945,13 @@ int main()
             if (match_integer()) {
                 // CMP Rn, imm -> CMPI Rn, imm
                 int src_imm = expect_integer(-8, 7);
-                emit("CMPI R%d, %d", dst_reg, src_imm);
+                emit(op_token, "CMPI R%d, %d", dst_reg, src_imm);
                 continue;
             }
 
             // CMP Rn, Rm
             int src_reg = expect_token(T_REGISTER)->ival;
-            emit("CMP R%d, R%d", dst_reg, src_reg);
+            emit(op_token, "CMP R%d, R%d", dst_reg, src_reg);
             continue;
         }
 
@@ -888,7 +965,7 @@ int main()
                 int dst_reg = expect_token(T_REGISTER)->ival;
                 expect_token(T_COMMA);
                 int src_reg = expect_token(T_REGISTER)->ival;
-                emit("%s R%d, R%d", op, dst_reg, src_reg);
+                emit(op_token, "%s R%d, R%d", op, dst_reg, src_reg);
                 continue;
             }
         }
@@ -903,7 +980,7 @@ int main()
                 int dst_reg = expect_token(T_REGISTER)->ival;
                 expect_token(T_COMMA);
                 int src_imm = expect_integer(0, 15);
-                emit("%s R%d, %d", op, dst_reg, src_imm);
+                emit(op_token, "%s R%d, %d", op, dst_reg, src_imm);
                 continue;
             }
         }
@@ -917,37 +994,37 @@ int main()
             if (i < size) {
                 if (match_integer()) {
                     int d = expect_integer(0, 15);
-                    emit("%s %d", jump_ops_dst[i], d);
+                    emit(op_token, "%s %d", jump_ops_dst[i], d);
                     continue;
                 }
 
                 char *label_name = new_string(expect_ident());
                 vector_push_back(pending,
                                  new_pair(label_name, (void *)emitted_size()));
-                emit("%s", jump_ops_dst[i]);
+                emit(op_token, "%s", jump_ops_dst[i]);
                 continue;
             }
         }
 
         if (streql(ident, "IN")) {
             int src_reg = expect_token(T_REGISTER)->ival;
-            emit("IN R%d", src_reg);
+            emit(op_token, "IN R%d", src_reg);
             continue;
         }
 
         if (streql(ident, "OUT")) {
             int src_reg = expect_token(T_REGISTER)->ival;
-            emit("OUT R%d", src_reg);
+            emit(op_token, "OUT R%d", src_reg);
             continue;
         }
 
         if (streql(ident, "RET")) {
-            emit("BR");
+            emit(op_token, "BR");
             continue;
         }
 
         if (streql(ident, "HLT")) {
-            emit("HLT");
+            emit(op_token, "HLT");
             continue;
         }
 
@@ -967,13 +1044,15 @@ int main()
         if (kv == NULL)
             failwith(-1, -1, "Undeclared label: \e[1m%s\e[m", label_name);
         int d = (int)(kv->value) - emit_index - 1;
-        vector_set(emits, emit_index,
-                   format("%s %d", (char *)vector_get(emits, emit_index), d));
+
+        EmitedLine *line = vector_get(emits, emit_index);
+        line->code = format("%s %d", line->code, d);
+        vector_set(emits, emit_index, line);
     }
 
     int nemits = emitted_size();
     for (int i = 0; i < nemits; i++) {
-        char *str = (char *)vector_get(emits, i);
-        puts(str);
+        EmitedLine *line = (EmitedLine *)vector_get(emits, i);
+        printf("%s\t%s\n", line->code, line->comment);
     }
 }
