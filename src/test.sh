@@ -79,30 +79,30 @@ test_assembler(){
 }
 
 test_assembler "
-LI  R1, 3
-MOV R0, R1
-HLT" 3
+LI  R1, 3  // hoge piyo
+MOV R0, R1 // hoge piyo
+HLT // hoge piyo" 3
 
 test_assembler "
-LI  R0, 3
-ADD R0, R0
+LI  R0, 3  // hoge piyo
+ADD R0, R0 // hoge piyo
 HLT" 6
 
 test_assembler "
-LI  R0, 3
-SUB R0, R0
+LI  R0, 3 // hoge piyo
+SUB R0, R0// hoge piyo
 HLT" 0
 
 test_assembler "
-LI  R0, 5
-LI  R1, 1
+LI  R0, 5 // hoge piyo
+LI  R1, 1 // hoge piyo
 AND R0, R1
 HLT" 1
 
 test_assembler "
 LI  R0, 5
-LI  R1, 2
-OR  R0, R1
+LI  R1, 2 // hoge piyo
+OR  R0, R1// hoge piyo
 HLT" 7
 
 test_assembler "
@@ -113,7 +113,7 @@ HLT" 4
 
 test_assembler "
 LI  R0, 1
-SLR R0, 1
+SLR R0, 1// hoge piyo
 HLT" 2
 
 test_assembler "
@@ -149,22 +149,22 @@ HLT" 0
 #HLT" 1
 
 test_assembler "
-LI  R1, 100
-ST  R1, 0(R1)
-LD  R0, 0(R1)
+LI  R1, 100   // hoge piyo
+ST  R1, 0(R1) // hoge piyo
+LD  R0, 0(R1) // hoge piyo
 HLT" 100
 
 test_assembler "
 LI  R0, 1
-B   1
+B   1// hoge piyo
 LI  R0, 2
 HLT" 1
 
 test_assembler "
 LI  R0, 1
 LI  R1, 1
-CMP R0, R1
-BE 1
+CMP R0, R1//hoge hoge piyo
+BE 1//hoge hoge piyo
 LI  R0, 0
 HLT" 1
 
@@ -172,15 +172,15 @@ test_assembler "
 LI  R0, 1
 LI  R1, 2
 CMP R0, R1
-BLT 1
-LI  R0, 0
+BLT 1//hoge hoge piyo
+LI  R0, 0//hoge hoge piyo
 HLT" 1
 
 test_assembler "
 LI  R0, 1
 LI  R1, 1
-CMP R0, R1
-BLE 1
+CMP R0, R1//hoge hoge piyo
+BLE 1//hoge hoge piyo
 LI  R0, 0
 HLT" 1
 
@@ -210,13 +210,13 @@ LI  R0, 0
 HLT" 0
 
 test_assembler "
-LI   R0, 1
-ADDI R0, 5
+LI   R0, 1//hoge hoge piyo
+ADDI R0, 5//hoge hoge piyo
 HLT" 6
 
 test_assembler "
-LI   R0, 1
-CMPI R0, 2
+LI   R0, 1//hoge hoge piyo
+CMPI R0, 2//hoge hoge piyo
 BE   1
 LI   R0, 0
 HLT" 0

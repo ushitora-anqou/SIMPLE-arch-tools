@@ -40,33 +40,33 @@ void assert_byte(int n)
 
 void read_reg(int *lhs)
 {
-    assert(fscanf(fh, " R%d", lhs) == 1);
+    assert(fscanf(fh, " R%d %*[#;/] %*256[^\n]", lhs) == 1);
     assert_reg(*lhs);
 }
 
 void read_reg_imm(int *lhs, int *rhs)
 {
-    assert(fscanf(fh, " R%d , %d", lhs, rhs) == 2);
+    assert(fscanf(fh, " R%d , %d %*[#;/] %*256[^\n]", lhs, rhs) == 2);
     assert_reg(*lhs);
     assert_byte(*rhs);
 }
 
 void read_reg_reg(int *lhs, int *rhs)
 {
-    assert(fscanf(fh, " R%d , R%d", lhs, rhs) == 2);
+    assert(fscanf(fh, " R%d , R%d %*[#;/] %*256[^\n]", lhs, rhs) == 2);
     assert_reg(*lhs);
     assert_reg(*rhs);
 }
 
 void read_imm(int *v)
 {
-    assert(fscanf(fh, " %d", v) == 1);
+    assert(fscanf(fh, " %d %*[#;/] %*256[^\n]", v) == 1);
     assert_byte(*v);
 }
 
 void read_reg_mem(int *ra, int *rb, int *d)
 {
-    assert(fscanf(fh, " R%d , %d ( R%d )", ra, d, rb) == 3);
+    assert(fscanf(fh, " R%d , %d ( R%d ) %*[#;/] %*256[^\n]", ra, d, rb) == 3);
     assert_reg(*ra);
     assert_reg(*rb);
     assert_byte(*d);
@@ -75,7 +75,7 @@ void read_reg_mem(int *ra, int *rb, int *d)
 void assemble()
 {
     char op[256];
-    while (fscanf(fh, "%s", op) != EOF) {
+    while (fscanf(fh, "%s %*[#;/] %*256[^\n]", op) != EOF) {
         if (streql(op, "ADD")) {
             int rd, rs;
             read_reg_reg(&rd, &rs);
@@ -203,6 +203,7 @@ void assemble()
             put23344(3, rs, 0, 13, 0);
         }
         else {
+            fprintf(stderr, "ERROR: NO SUCH OP: '%s'\n", op);
             assert(0);
         }
     }
