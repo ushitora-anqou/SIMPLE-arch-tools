@@ -2,14 +2,14 @@ CFLAGS=-std=c11 -g3 -O0 -Wall
 
 all: debugger emulator assembler encoder macro
 
-debugger: debugger.h debugger.c asm.c emu.c
-	gcc $(CFLAGS) -o $@ debugger.c asm.c emu.c
+debugger: debugger.h debugger.c asm.c emu.c utility.c utility.h
+	gcc $(CFLAGS) -o $@ debugger.c asm.c emu.c utility.c
 
-emulator: debugger.h emulator.c emu.c utility.c
+emulator: debugger.h emulator.c emu.c utility.c utility.h
 	gcc $(CFLAGS) -o $@ emulator.c emu.c utility.c
 
-assembler: debugger.h assembler.c asm.c
-	gcc $(CFLAGS) -o $@ assembler.c asm.c
+assembler: debugger.h assembler.c asm.c utility.c utility.h
+	gcc $(CFLAGS) -o $@ assembler.c asm.c utility.c
 
 encoder: encoder.c
 	gcc $(CFLAGS) -o $@ $^

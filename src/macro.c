@@ -64,25 +64,6 @@ void vector_push_back_vector(Vector *vec, Vector *src)
         vector_push_back(vec, vector_get(src, i));
 }
 
-char *vformat(const char *src, va_list ap)
-{
-    char buf[512];  // TODO: enough length?
-    vsprintf(buf, src, ap);
-
-    char *ret = (char *)malloc(strlen(buf) + 1);
-    strcpy(ret, buf);
-    return ret;
-}
-
-char *format(const char *src, ...)
-{
-    va_list args;
-    va_start(args, src);
-    char *ret = vformat(src, args);
-    va_end(args);
-    return ret;
-}
-
 typedef struct Pair Pair;
 struct Pair {
     void *first, *second;

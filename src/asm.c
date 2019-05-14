@@ -1,12 +1,8 @@
 #include "debugger.h"
+#include "utility.h"
 
 static FILE *fh;
 static Word im[64 * 1024], nim;
-
-int streql(const char *lhs, const char *rhs)
-{
-    return strcmp(lhs, rhs) == 0;
-}
 
 void putword(Word n)
 {
