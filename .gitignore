@@ -60,3 +60,6 @@ src/macro
 src/_test1.s
 src/_test2.s
 src/debugger
+*.membin
+*.pdf
+.byebug_history
