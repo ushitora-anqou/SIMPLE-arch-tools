@@ -892,7 +892,7 @@ void emit(Token *src, char *str, ...)
     line->code = vformat(str, args);
     va_end(args);
 
-    line->comment = format("# %04d %s", src->line_row, src->read_line);
+    line->comment = format("# %04d %s", src->line_row + 1, src->read_line);
     if (line->comment[strlen(line->comment) - 1] == '\n')
         line->comment[strlen(line->comment) - 1] = '\0';
 
@@ -1086,6 +1086,10 @@ int main()
     int nemits = emitted_size();
     for (int i = 0; i < nemits; i++) {
         EmitedLine *line = (EmitedLine *)vector_get(emits, i);
-        printf("%s\t%s\n", line->code, line->comment);
+        // pretty print
+        printf("%s", line->code);
+        int nspace = 20 - strlen(line->code);
+        for (int i = 0; i < nspace; i++) printf(" ");
+        printf("%s\n", line->comment);
     }
 }
