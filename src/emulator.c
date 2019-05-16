@@ -38,13 +38,15 @@ int main(int argc, char **argv)
         load_membin(initial_membin_path, getMEM());
     }
 
-    while (!stepEmu())
-        ;
+    int ninsts = 0;
+    while (!stepEmu()) ninsts++;
 
     if (memdump_flag) {
         Word *mem = getMEM();
         for (int i = 0; i < 0x1C00; i++) printf("%04X : %04X\n", i, mem[i]);
     }
+
+    printf("#insts: %d\n", ninsts);
 
     return getRegVal(0);
 }
