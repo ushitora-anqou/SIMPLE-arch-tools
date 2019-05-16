@@ -130,38 +130,62 @@ int map_erase(Map *map, const char *key)
     return erased_cnt;
 }
 
-static int line_row = 0, line_column = 0, prev_max_line_column;
-static char *read_line = NULL, *prev_read_line = NULL;
+static int line_row = 0, line_column = 0;
+static Vector *input_lines = NULL;
+static char *read_line = NULL;
+
+void read_all_lines(FILE *fh)
+{
+    assert(input_lines == NULL);
+
+    input_lines = new_vector();
+
+    char buf[512];
+    while (fgets(buf, sizeof(buf), fh) != NULL)
+        vector_push_back(input_lines, new_string(buf));
+
+    read_line = (char *)vector_get(input_lines, 0);
+}
 
 int get_char(void)
 {
-    if (read_line == NULL) {
-        read_line = (char *)malloc(256);
-        if (fgets(read_line, 256, stdin) == NULL) return EOF;
-    }
+    assert(input_lines != NULL);
+
+    if (line_row >= vector_size(input_lines)) return EOF;
 
     int ch = read_line[line_column++];
     if (ch == '\n') {
         line_row++;
-        prev_max_line_column = line_column - 1;
         line_column = 0;
-
-        prev_read_line = read_line;
-        read_line = NULL;
+        read_line = (char *)vector_get(input_lines, line_row);
+    }
+    else if (ch == '\0') {
+        ch = EOF;
+        line_column--;
     }
 
     return ch;
 }
 
-void unget_char(int ch)
+void unget_char(void)
 {
-    line_column--;
-    if (ch == '\n') {
-        line_row--;
-        line_column = prev_max_line_column;
+    if (--line_column < 0) {
+        assert(line_row >= 1 && line_column == -1);
 
-        read_line = prev_read_line;
+        line_row--;
+        read_line = (char *)vector_get(input_lines, line_row);
+        line_column = strlen(read_line) - 1;
     }
+}
+
+char *get_prev_read_line()
+{
+    return (char *)vector_get(input_lines, line_row - 1);
+}
+
+int get_prev_max_line_column()
+{
+    return strlen(get_prev_read_line());
 }
 
 typedef struct Token Token;
@@ -420,8 +444,8 @@ Token *next_token()
 
             // '\n' is the last letter of the previous line.
             token->line_row--;
-            token->line_column = prev_max_line_column;
-            token->read_line = prev_read_line;
+            token->line_column = get_prev_max_line_column();
+            token->read_line = get_prev_read_line();
 
             return token;
         }
@@ -439,14 +463,14 @@ Token *next_token()
                     token->ival = ch - '0';
                     return token;
                 }
-                unget_char(ch);
+                unget_char();
             }
 
             while ((ch = get_char()) != EOF) {
                 if (!(isalnum(ch) || ch == '_')) break;
                 sval[i++] = ch;
             }
-            unget_char(ch);
+            unget_char();
             sval[i++] = '\0';
 
             if (streql(sval, "define")) {
@@ -481,7 +505,7 @@ Token *next_token()
             if (ch == '0') {
                 ch = get_char();
                 if (ch != 'x') {  // just 0
-                    unget_char(ch);
+                    unget_char();
                     token->ival = 0;
                     return token;
                 }
@@ -499,7 +523,7 @@ Token *next_token()
                     else
                         break;
                 }
-                unget_char(ch);
+                unget_char();
                 token->ival = ival;
                 return token;
             }
@@ -507,7 +531,7 @@ Token *next_token()
             // decimal number
             int ival = ch - '0';
             while (isdigit(ch = get_char())) ival = ival * 10 + ch - '0';
-            unget_char(ch);
+            unget_char();
             token->ival = ival;
             return token;
         }
@@ -538,7 +562,7 @@ Token *next_token()
                 break;
             }
 
-            unget_char(ch);
+            unget_char();
             token->kind = T_PLUS;
         } break;
 
@@ -549,7 +573,7 @@ Token *next_token()
                 break;
             }
 
-            unget_char(ch);
+            unget_char();
             token->kind = T_MINUS;
         } break;
 
@@ -567,7 +591,7 @@ Token *next_token()
                 token->kind = T_LTEQ;
                 break;
             }
-            unget_char(ch);
+            unget_char();
             token->kind = T_LT;
         } break;
 
@@ -594,7 +618,7 @@ Token *next_token()
                 token->kind = T_NEQ;
                 break;
             }
-            unget_char(ch);
+            unget_char();
             goto unrecognized_character;
 
         case '=':
@@ -603,7 +627,7 @@ Token *next_token()
                 token->kind = T_EQEQ;
                 break;
             }
-            unget_char(ch);
+            unget_char();
             token->kind = T_EQ;
             break;
 
@@ -640,8 +664,10 @@ unrecognized_character:
 static Vector *input_tokens;
 static int input_tokens_npos;
 
-void read_all_tokens()
+void read_all_tokens(FILE *fh)
 {
+    read_all_lines(fh);
+
     Token *token;
     while ((token = next_token()) != NULL)
         vector_push_back(input_tokens, token);
@@ -934,7 +960,7 @@ int main()
     emits = new_vector();
     input_tokens = new_vector();
 
-    read_all_tokens();
+    read_all_tokens(stdin);
     preprocess();
 
     while (peek_token() != NULL) {
