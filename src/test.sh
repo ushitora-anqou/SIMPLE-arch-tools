@@ -596,6 +596,30 @@ R3 = 7
 hoge
 HLT" 10
 
+test_macro_error() {
+    res=$(echo "$1" | ./macro 2>&1)
+    echo $res | egrep "$2" > /dev/null
+    [ $? -eq 0 ] ||\
+        fail "[ERROR] \"$1\": expect \"$2\" but got $res"
+}
 
+test_macro_error "
+ADD R0, R2
+%" "3:1:.+Unrecognized character.+%"
+
+test_macro_error "
+ADD R0, hoge
+" "2:9:.+Unexpected token.+register"
+
+test_macro_error "
+ADD R0," "3:1:.+Unexpected EOF"
+
+test_macro_error "
+define hoge
+define hoge" "3:8:.+macro with the same name"
+
+test_macro_error "JMP hoge" "Undeclared label.+hoge"
+
+test_macro_error "R1 += +=" "1:7:.+Unexpected token.+register"
 
 echo "ok"
