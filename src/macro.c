@@ -6,6 +6,9 @@
 #include <string.h>
 #include "utility.h"
 
+typedef struct Token_tag Token;
+_Noreturn void failwith(Token *cause, const char *msg, ...);
+
 typedef struct Vector Vector;
 struct Vector {
     void **data;
@@ -158,6 +161,7 @@ int get_char(void)
         // continuous lines
         line_row++;
         read_line = (char *)vector_get(input_lines, line_row);
+        if (read_line == NULL) failwith(NULL, "Unexpected EOF");
         ch = read_line[line_column++];
     }
     if (ch == '\n') {
@@ -194,8 +198,8 @@ int get_prev_max_line_column()
     return strlen(get_prev_read_line());
 }
 
-typedef struct Token Token;
-struct Token {
+typedef struct Token_tag Token;
+struct Token_tag {
     int line_row, line_column;
     char *read_line;
 
@@ -664,7 +668,8 @@ Token *next_token()
     return NULL;
 
 unrecognized_character:
-    failwith(NULL, "Unrecognized character: \e[1m'%c'\e[m", ch);
+    error_at(line_row + 1, line_column,
+             format("Unrecognized character: \e[1m'%c'\e[m", ch));
 }
 
 static Vector *input_tokens;
