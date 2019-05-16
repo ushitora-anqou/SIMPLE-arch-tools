@@ -154,6 +154,12 @@ int get_char(void)
     if (line_row >= vector_size(input_lines)) return EOF;
 
     int ch = read_line[line_column++];
+    if (ch == '\\' && read_line[line_column] == '\n') {
+        // continuous lines
+        line_row++;
+        read_line = (char *)vector_get(input_lines, line_row);
+        ch = read_line[line_column++];
+    }
     if (ch == '\n') {
         line_row++;
         line_column = 0;

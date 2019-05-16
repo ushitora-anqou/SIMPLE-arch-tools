@@ -573,5 +573,29 @@ define foo R7
 foo = 2
 HLT" 7
 
+test_macro "
+R0\
+    = \
+    5
+R\
+1 = 6
+R0 &\
+= R\
+1
+H\
+LT" 4
+
+test_macro "
+define hoge \
+    MOV R0, R2 \
+    ADD R0, R3
+
+R0 = 2
+R2 = 3
+R3 = 7
+hoge
+HLT" 10
+
+
 
 echo "ok"
