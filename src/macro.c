@@ -23,10 +23,12 @@ Vector *new_vector()
 
 void vector_push_back(Vector *vec, void *item)
 {
+    assert(vec != NULL);
+
     if (vec->size == vec->rsved_size) {
         vec->rsved_size = vec->rsved_size > 0 ? vec->rsved_size * 2 : 2;
         void **ndata = (void **)malloc(sizeof(void *) * vec->rsved_size);
-        memcpy(ndata, vec->data, vec->size * sizeof(void *));
+        if (vec->data) memcpy(ndata, vec->data, vec->size * sizeof(void *));
         vec->data = ndata;
     }
 
@@ -379,10 +381,24 @@ const char *tokenkind2str(int kind)
     }
 }
 
-_Noreturn void failwith_unexpected_token(int line_row, int line_column,
-                                         const char *got, const char *expected)
+_Noreturn void failwith(Token *cause, const char *msg, ...)
 {
-    failwith(line_row + 1, line_column + 1,
+    char buf[512];
+    va_list args;
+    va_start(args, msg);
+    vsnprintf(buf, 512, msg, args);
+    va_end(args);
+
+    if (cause)
+        error_at(cause->line_row + 1, cause->line_column + 1, buf);
+    else
+        error_at(line_row + 1, line_column + 1, buf);
+}
+
+_Noreturn void failwith_unexpected_token(Token *token, const char *got,
+                                         const char *expected)
+{
+    failwith(token,
              "Unexpected token: got \e[1m'%s'\e[m but expected \e[1m'%s'\e[m",
              got, expected);
 }
@@ -618,8 +634,7 @@ Token *next_token()
     return NULL;
 
 unrecognized_character:
-    failwith(line_row + 1, line_column + 1,
-             "Unrecognized character: \e[1m'%c'\e[m", ch);
+    failwith(NULL, "Unrecognized character: \e[1m'%c'\e[m", ch);
 }
 
 static Vector *input_tokens;
@@ -646,10 +661,9 @@ Token *expect_token(int kind)
 {
     Token *token = pop_token();
     if (token == NULL)
-        failwith(line_row + 1, line_column + 1, "Unexpected EOF");
+        error_at(line_row + 1, line_column + 1, "Unexpected EOF");
     if (token->kind != kind)
-        failwith_unexpected_token(token->line_row, token->line_column,
-                                  token2str(token), tokenkind2str(kind));
+        failwith_unexpected_token(token, token2str(token), tokenkind2str(kind));
 
     return token;
 }
@@ -682,8 +696,7 @@ int expect_integer(int min, int max)
     int num = mul * token->ival;
 
     if (num < min || max < num)
-        failwith_unexpected_token(token->line_row, token->line_column,
-                                  format("%d", num),
+        failwith_unexpected_token(token, format("%d", num),
                                   format("number in [%d, %d]", min, max));
     return num;
 }
@@ -722,6 +735,10 @@ void preprocess()
                 vector_push_back(code, pop_token());
             if (peek_token() != NULL) pop_token();  // pop T_NEWLINE
 
+            if (map_lookup(macros, name) != NULL)
+                failwith(ident_token,
+                         "Can't define macro with the same name: %s", name);
+
             map_insert(macros, name, code);
             continue;
         }
@@ -752,6 +769,7 @@ void preprocess()
 
         vector_push_back(dst, pop_token());
     }
+    free(macros);
 
     // set new tokens
     input_tokens = dst;
@@ -776,8 +794,7 @@ void preprocess()
 
             // operator
             Token *token = pop_token();
-            if (token == NULL)
-                failwith(line_row + 1, line_column + 1, "Unexpected EOF");
+            if (token == NULL) failwith(NULL, "Unexpected EOF");
             int op_kind = token->kind;
 
             // right hand side
@@ -826,12 +843,10 @@ void preprocess()
             Token *label = expect_token(T_IDENT);  // label
 
             if (lhs->kind != T_REGISTER && lhs->kind != T_INTEGER)
-                failwith_unexpected_token(lhs->line_row, lhs->line_column,
-                                          token2str(lhs),
+                failwith_unexpected_token(lhs, token2str(lhs),
                                           "register or integer");
             if (rhs->kind != T_REGISTER && rhs->kind != T_INTEGER)
-                failwith_unexpected_token(rhs->line_row, rhs->line_column,
-                                          token2str(rhs),
+                failwith_unexpected_token(rhs, token2str(rhs),
                                           "register or integer");
 
             // set the source token to the left-most one
@@ -857,8 +872,7 @@ void preprocess()
                 vector_push_back(dst, new_ident("JLE"));
                 break;
             default:
-                failwith_unexpected_token(op->line_row, op->line_column,
-                                          token2str(op), "==, !=, <, <=");
+                failwith_unexpected_token(op, token2str(op), "==, !=, <, <=");
             }
             vector_push_back(dst, label);
 
@@ -1083,7 +1097,8 @@ int main()
 
         KeyValue *kv = map_lookup(labels, label_name);
         if (kv == NULL)
-            failwith(-1, -1, "Undeclared label: \e[1m%s\e[m", label_name);
+            // TODO: position the label was used?
+            failwith(NULL, "Undeclared label: \e[1m%s\e[m", label_name);
         int d = (int)(kv->value) - emit_index - 1;
 
         EmitedLine *line = vector_get(emits, emit_index);

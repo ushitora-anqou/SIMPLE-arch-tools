@@ -9,15 +9,10 @@ int streql(const char *lhs, const char *rhs)
     return strcmp(lhs, rhs) == 0;
 }
 
-_Noreturn void failwith(int row, int column, const char *msg, ...)
+_Noreturn void error_at(int row, int column, const char *msg)
 {
-    va_list args;
-    va_start(args, msg);
     if (row != -1) fprintf(stderr, "\e[1mstdin:%d:%d: ", row, column);
-    fprintf(stderr, "\e[31mERROR:\e[m ");
-    vfprintf(stderr, msg, args);
-    fprintf(stderr, "\n");
-    va_end(args);
+    fprintf(stderr, "\e[31mERROR:\e[m %s\n", msg);
     exit(1);
 }
 
