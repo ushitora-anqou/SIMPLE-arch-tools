@@ -106,10 +106,26 @@ KeyValue *map_lookup(Map *map, const char *key)
 {
     for (int i = 0; i < vector_size(map->data); i++) {
         KeyValue *kv = (KeyValue *)vector_get(map->data, i);
-        if (strcmp(kv->key, key) == 0) return kv;
+        if (kv != NULL && strcmp(kv->key, key) == 0) return kv;
     }
 
     return NULL;
+}
+
+int map_erase(Map *map, const char *key)
+{
+    int erased_cnt = 0;
+
+    for (int i = 0; i < vector_size(map->data); i++) {
+        KeyValue *kv = (KeyValue *)vector_get(map->data, i);
+        if (kv != NULL && strcmp(kv->key, key) == 0) {
+            // found
+            vector_set(map->data, i, NULL);
+            erased_cnt++;
+        }
+    }
+
+    return erased_cnt;
 }
 
 static int line_row = 0, line_column = 0, prev_max_line_column;
@@ -174,6 +190,7 @@ struct Token {
         T_ANDEQ,
         T_OREQ,
         K_DEFINE,
+        K_UNDEF,
         K_IF,
         K_THEN,
         K_GOTO,
@@ -289,6 +306,8 @@ const char *token2str(Token *token)
         return "==";
     case K_DEFINE:
         return "define";
+    case K_UNDEF:
+        return "undef";
     case K_IF:
         return "if";
     case K_THEN:
@@ -347,6 +366,8 @@ const char *tokenkind2str(int kind)
         return "|=";
     case K_DEFINE:
         return "keyword define";
+    case K_UNDEF:
+        return "keyword undef";
     case K_IF:
         return "keyword if";
     case K_THEN:
@@ -414,6 +435,10 @@ Token *next_token()
 
             if (streql(sval, "define")) {
                 token->kind = K_DEFINE;
+                return token;
+            }
+            if (streql(sval, "undef")) {
+                token->kind = K_UNDEF;
                 return token;
             }
             if (streql(sval, "if")) {
@@ -690,12 +715,21 @@ void preprocess()
     Map *macros = new_map();
     while (peek_token() != NULL) {
         if (pop_token_if(K_DEFINE)) {
-            char *name = expect_ident();
+            Token *ident_token = expect_token(T_IDENT);
+            char *name = ident_token->sval;
             Vector *code = new_vector();
             while (peek_token() != NULL && !match_token(T_NEWLINE))
                 vector_push_back(code, pop_token());
             if (peek_token() != NULL) pop_token();  // pop T_NEWLINE
+
             map_insert(macros, name, code);
+            continue;
+        }
+
+        if (pop_token_if(K_UNDEF)) {
+            char *name = expect_ident();
+            expect_token(T_NEWLINE);
+            map_erase(macros, name);
             continue;
         }
 

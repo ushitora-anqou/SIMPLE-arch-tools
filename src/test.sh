@@ -557,4 +557,21 @@ R1 = 6
 R0 |= R1
 HLT" 7
 
+test_macro "
+define hoge R1
+hoge = 3
+undef hoge
+define hoge R0
+hoge = 5
+undef hoge
+define hoge R1
+hoge = 0
+undef hoge
+define hoge R0
+hoge = 7
+define foo R7
+foo = 2
+HLT" 7
+
+
 echo "ok"
