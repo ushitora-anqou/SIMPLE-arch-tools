@@ -1,6 +1,8 @@
 #include "debugger.h"
 #include "utility.h"
 
+#include <getopt.h>
+
 static Word im[64 * 1024];
 
 void load_membin(const char *filepath, Word *dm)
@@ -19,9 +21,27 @@ void load_membin(const char *filepath, Word *dm)
 
 int main(int argc, char **argv)
 {
-    int memdump_flag = argc == 2;
+    int quiet_flag = 0, memdump_flag = 0;
     char *initial_membin_path = NULL;
-    if (argc == 2) initial_membin_path = argv[1];
+
+    int opt;
+    while ((opt = getopt(argc, argv, "qdm:")) != -1) {
+        switch (opt) {
+        case 'q':
+            quiet_flag = 1;
+            break;
+        case 'd':
+            memdump_flag = 1;
+            break;
+        case 'm':
+            initial_membin_path = new_string(optarg);
+            break;
+        default:
+            fprintf(stderr, "Usage: %s [-q] [-d] [-m initial-membin-path]\n",
+                    argv[0]);
+            exit(EXIT_FAILURE);
+        }
+    }
 
     int ch, i = 0;
     while ((ch = getchar()) != EOF) {
@@ -46,7 +66,7 @@ int main(int argc, char **argv)
         for (int i = 0; i < 0x1C00; i++) printf("%04X : %04X\n", i, mem[i]);
     }
 
-    printf("#insts: %d\n", ninsts);
+    if (!quiet_flag) printf("#insts: %d\n", ninsts);
 
     return getRegVal(0);
 }

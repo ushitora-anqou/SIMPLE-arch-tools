@@ -6,13 +6,6 @@
 #include <string.h>
 #include "utility.h"
 
-char *new_string(const char *src)
-{
-    char *buf = (char *)malloc(strlen(src) + 1);
-    strcpy(buf, src);
-    return buf;
-}
-
 typedef struct Vector Vector;
 struct Vector {
     void **data;

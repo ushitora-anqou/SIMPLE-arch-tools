@@ -39,3 +39,10 @@ char *format(const char *src, ...)
     va_end(args);
     return ret;
 }
+
+char *new_string(const char *src)
+{
+    char *buf = (char *)malloc(strlen(src) + 1);
+    strcpy(buf, src);
+    return buf;
+}
