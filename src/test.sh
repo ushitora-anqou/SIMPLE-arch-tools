@@ -73,7 +73,7 @@ test_emulator "c[0 1 100] b[1 1 1 0] b[0 0 1 0] a[0 0 15 0]" 100
 ### asm
 
 test_assembler(){
-    echo "$1" | ./assembler | ./emulator -q
+    echo -n "$1" | ./assembler | ./emulator -q
     res=$?
     [ $res -eq $2 ] || fail "[ERROR] \"$1\": expect $2 but got $res"
 }
@@ -712,9 +712,10 @@ loop:
     BLE loop
     HLT" 11
 
+test_macro "LI R0, 10 HLT  #\n" 10
 
 test_macro_error() {
-    res=$(echo "$1" | ./macro 2>&1)
+    res=$(echo -n "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null
     [ $? -eq 0 ] ||\
         fail "[ERROR] \"$1\": expect \"$2\" but got $res"
@@ -729,7 +730,8 @@ ADD R0, hoge
 " "2:9:.+Unexpected token.+register"
 
 test_macro_error "
-ADD R0," "3:1:.+Unexpected EOF"
+ADD R0,
+" "3:1:.+Unexpected EOF"
 
 test_macro_error "
 define hoge
@@ -737,7 +739,8 @@ define hoge" "3:8:.+macro with the same name"
 
 test_macro_error "JMP hoge" "Undeclared label.+hoge"
 
-test_macro_error "R1 += +=" "1:7:.+Unexpected token.+register"
+test_macro_error "R1 += +=
+" "1:7:.+Unexpected token.+register"
 
 test_macro_error "end(hoge)" "1:1:.+Invalid end of label namespace"
 

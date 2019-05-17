@@ -155,6 +155,7 @@ int get_char(void)
     assert(input_lines != NULL);
 
     if (line_row >= vector_size(input_lines)) return EOF;
+    assert(read_line == NULL || line_column <= strlen(read_line));
 
     int ch = read_line[line_column++];
     while (ch == '\\' && read_line[line_column] == '\n') {
@@ -172,7 +173,6 @@ int get_char(void)
     }
     else if (ch == '\0') {
         ch = EOF;
-        line_column--;
     }
 
     return ch;
@@ -1123,7 +1123,8 @@ void preprocess()
             continue;
         }
 
-        while (!pop_token_if(T_NEWLINE)) vector_push_back(dst, pop_token());
+        while (peek_token() != NULL && !pop_token_if(T_NEWLINE))
+            vector_push_back(dst, pop_token());
     }
 
     input_tokens = dst;
