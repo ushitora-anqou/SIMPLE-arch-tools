@@ -1293,8 +1293,10 @@ int main()
         }
 
         {
-            char *jump_ops_src[] = {"JMP", "JE", "JNE", "JL", "JLE", "CALL"},
-                 *jump_ops_dst[] = {"B", "BE", "BNE", "BLT", "BLE", "BAL"};
+            char *jump_ops_src[] = {"JMP", "JE",  "JNE", "JL",  "JLE", "B",
+                                    "BE",  "BNE", "BLT", "BLE", "CALL"},
+                 *jump_ops_dst[] = {"B",  "BE",  "BNE", "BLT", "BLE", "B",
+                                    "BE", "BNE", "BLT", "BLE", "BAL"};
             int i = 0, size = sizeof(jump_ops_src) / sizeof(char *);
             for (; i < size; i++)
                 if (streql(ident, jump_ops_src[i])) break;
@@ -1338,6 +1340,15 @@ int main()
             expect_token(T_RPAREN);
 
             emit(op_token, "ST R%d, %d(R%d)", src_reg, disp, dst_reg);
+            continue;
+        }
+
+        if (streql(ident, "LI")) {
+            int src_reg = expect_token(T_REGISTER)->ival;
+            expect_token(T_COMMA);
+            int imm = expect_integer(1, 8);
+
+            emit(op_token, "LI R%d, %d", src_reg, imm);
             continue;
         }
 

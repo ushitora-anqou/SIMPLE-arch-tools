@@ -681,6 +681,38 @@ LD R0, (R1)
 HLT
 " 10
 
+test_macro "
+LI R0, 100
+HLT" 100
+
+test_macro "
+MOV R0, 2
+B exit
+MOV R0,-1
+exit:
+HLT" 2
+
+test_macro "
+    MOV R0, 0
+    MOV R1, 10
+    MOV R2, 1
+loop:
+    ADD R0, R2
+    CMP R0, R1
+    BLT loop
+    HLT" 10
+
+test_macro "
+    MOV R0, 0
+    MOV R1, 10
+    MOV R2, 1
+loop:
+    ADD R0, R2
+    CMP R0, R1
+    BLE loop
+    HLT" 11
+
+
 test_macro_error() {
     res=$(echo "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null
