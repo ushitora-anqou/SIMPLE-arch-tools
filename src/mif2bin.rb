@@ -1,6 +1,6 @@
 #!/usr/bin/ruby
 
-require "byebug"
+#require "byebug"
 
 raise "Usage: ruby mif2bin.rb input-mif-file-path output-bin-file-path" unless ARGV.size == 2
 
