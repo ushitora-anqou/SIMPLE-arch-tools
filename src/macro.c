@@ -157,12 +157,13 @@ int get_char(void)
     if (line_row >= vector_size(input_lines)) return EOF;
 
     int ch = read_line[line_column++];
-    if (ch == '\\' && read_line[line_column] == '\n') {
+    while (ch == '\\' && read_line[line_column] == '\n') {
         // continuous lines
         line_row++;
         read_line = (char *)vector_get(input_lines, line_row);
         if (read_line == NULL) failwith(NULL, "Unexpected EOF");
-        ch = read_line[line_column++];
+        ch = read_line[0];
+        line_column = 1;
     }
     if (ch == '\n') {
         line_row++;
@@ -177,6 +178,16 @@ int get_char(void)
     return ch;
 }
 
+char *get_prev_read_line()
+{
+    return (char *)vector_get(input_lines, line_row - 1);
+}
+
+int get_prev_max_line_column()
+{
+    return strlen(get_prev_read_line());
+}
+
 void unget_char(void)
 {
     if (--line_column < 0) {
@@ -186,16 +197,18 @@ void unget_char(void)
         read_line = (char *)vector_get(input_lines, line_row);
         line_column = strlen(read_line) - 1;
     }
-}
 
-char *get_prev_read_line()
-{
-    return (char *)vector_get(input_lines, line_row - 1);
-}
-
-int get_prev_max_line_column()
-{
-    return strlen(get_prev_read_line());
+    while (line_column == 0 && line_row >= 1) {
+        char *prev_line = get_prev_read_line();
+        int size = get_prev_max_line_column();
+        if (size >= 2 && prev_line[size - 1] == '\n' &&
+            prev_line[size - 2] == '\\') {
+            // continuous lines
+            line_row--;
+            read_line = prev_line;
+            line_column = size - 2;
+        }
+    }
 }
 
 typedef struct {
@@ -775,7 +788,9 @@ void read_all_tokens(FILE *fh)
 
 Token *pop_token()
 {
-    return vector_get(input_tokens, input_tokens_npos++);
+    Token *token = vector_get(input_tokens, input_tokens_npos++);
+    if (token == NULL) failwith(NULL, "Unexpected EOF");
+    return token;
 }
 
 Token *peek_token()
@@ -786,8 +801,6 @@ Token *peek_token()
 Token *expect_token(int kind)
 {
     Token *token = pop_token();
-    if (token == NULL)
-        error_at(line_row + 1, line_column + 1, "Unexpected EOF");
     if (token->kind != kind)
         failwith_unexpected_token(token, token2str(token), tokenkind2str(kind));
 
@@ -977,7 +990,6 @@ void preprocess()
 
             // operator
             Token *token = pop_token();
-            if (token == NULL) failwith(NULL, "Unexpected EOF");
             int op_kind = token->kind;
 
             // right hand side

@@ -574,23 +574,38 @@ foo = 2
 HLT" 7
 
 test_macro "
-R0\
-    = \
+R0\\
+    = \\
     5
-R\
+R\\
 1 = 6
-R0 &\
-= R\
+R0 &\\
+= R\\
 1
-H\
+H\\
 LT" 4
 
 test_macro "
-define hoge \
-    MOV R0, R2 \
+define hoge \\
+    MOV R0, R2 \\
     ADD R0, R3
 
 R0 = 2
+R2 = 3
+R3 = 7
+hoge
+HLT" 10
+
+test_macro "
+define hoge \\
+    MOV R0, R2 \\
+    ADD R0, R3
+
+R0\\
+\\
+\\
+\\
+= 2
 R2 = 3
 R3 = 7
 hoge
@@ -685,5 +700,20 @@ R0 = 5
 R1 = 3
 addsub(R0, R1)
 HLT" "5:1:.+Unexpected token.+','"
+
+test_macro_error "
+define hoge \\
+    MOV R0, R2 \\
+    ADD R0, R3
+
+R0\\
+\\
+\\
+\\
+= ,2
+R2 = 3
+R3 = 7
+hoge
+HLT" "10:3:.+Unexpected token.+','"
 
 echo "ok"
