@@ -654,6 +654,32 @@ R1 = 3
 addsub(R0, R1)
 HLT" 0
 
+test_macro "
+MOV R0, 10
+MOV R1, 100
+ST R0, -20(R1)
+MOV R0, -1
+LD R0, -20(R1)
+HLT
+" 10
+
+test_macro "
+MOV R0, 10
+MOV R1, 100
+ST R0, 20(R1)
+MOV R0, -1
+LD R0, 20(R1)
+HLT
+" 10
+
+test_macro "
+MOV R0, 10
+MOV R1, 100
+ST R0, (R1)
+MOV R0, -1
+LD R0, (R1)
+HLT
+" 10
 
 test_macro_error() {
     res=$(echo "$1" | ./macro 2>&1)

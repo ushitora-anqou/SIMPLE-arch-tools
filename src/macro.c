@@ -1315,6 +1315,32 @@ int main()
             }
         }
 
+        if (streql(ident, "LD")) {
+            int dst_reg = expect_token(T_REGISTER)->ival;
+            expect_token(T_COMMA);
+            int disp = 0;
+            if (match_integer()) disp = expect_integer(1, 8);
+            expect_token(T_LPAREN);
+            int src_reg = expect_token(T_REGISTER)->ival;
+            expect_token(T_RPAREN);
+
+            emit(op_token, "LD R%d, %d(R%d)", dst_reg, disp, src_reg);
+            continue;
+        }
+
+        if (streql(ident, "ST")) {
+            int src_reg = expect_token(T_REGISTER)->ival;
+            expect_token(T_COMMA);
+            int disp = 0;
+            if (match_integer()) disp = expect_integer(1, 8);
+            expect_token(T_LPAREN);
+            int dst_reg = expect_token(T_REGISTER)->ival;
+            expect_token(T_RPAREN);
+
+            emit(op_token, "ST R%d, %d(R%d)", src_reg, disp, dst_reg);
+            continue;
+        }
+
         if (streql(ident, "IN")) {
             int src_reg = expect_token(T_REGISTER)->ival;
             emit(op_token, "IN R%d", src_reg);
