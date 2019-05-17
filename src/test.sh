@@ -627,34 +627,6 @@ end(piyo)
 HLT" 4
 
 test_macro "
-define hoge(a, b) ADD a, b
-R0 = 3
-R1 = 5
-hoge(R0, R1)
-HLT" 8
-
-test_macro "
-define hoge() ADD R0, R1
-R0 = 3
-R1 = 5
-hoge ()
-HLT" 8
-
-test_macro "
-define hoge(a) ADD a, a
-R0 = 3
-R1 = 5
-hoge (R0)
-HLT" 6
-
-test_macro "
-define addsub(a, b) ADD a, b MOV b, a SUB a, b
-R0 = 5
-R1 = 3
-addsub(R0, R1)
-HLT" 0
-
-test_macro "
 MOV R0, 10
 MOV R1, 100
 ST R0, -20(R1)
@@ -753,13 +725,6 @@ R0 = 3
 R1 = 5
 hoge(R0, R1)
 HLT" "5:1:.+Unexpected token.+'\('"
-
-test_macro_error "
-define addsub(a, b) ADD a, b MOV b, a SUB ,a
-R0 = 5
-R1 = 3
-addsub(R0, R1)
-HLT" "5:1:.+Unexpected token.+','"
 
 test_macro_error "
 define hoge \\
