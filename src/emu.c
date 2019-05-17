@@ -255,3 +255,14 @@ Word *getMEM()
 {
     return mem;
 }
+
+void load_membin(FILE *fh)
+{
+    int i = 0, ch;
+    while ((ch = fgetc(fh)) != EOF) {
+        int ch2 = fgetc(fh);
+        assert(ch2 != EOF);
+        // TODO: assume that SIMPLE arch is big endian.
+        mem[i++] = ((Word)ch << 8) | (Word)ch2;
+    }
+}

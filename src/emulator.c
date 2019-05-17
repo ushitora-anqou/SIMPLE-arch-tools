@@ -5,20 +5,6 @@
 
 static Word im[64 * 1024];
 
-void load_membin(const char *filepath, Word *dm)
-{
-    FILE *fh = fopen(filepath, "r");
-    assert(fh != NULL);
-
-    int i = 0, ch;
-    while ((ch = fgetc(fh)) != EOF) {
-        int ch2 = fgetc(fh);
-        assert(ch2 != EOF);
-        // TODO: assume that SIMPLE arch is big endian.
-        dm[i++] = ((Word)ch << 8) | (Word)ch2;
-    }
-}
-
 int main(int argc, char **argv)
 {
     int quiet_flag = 0, memdump_flag = 0;
@@ -55,7 +41,14 @@ int main(int argc, char **argv)
 
     if (initial_membin_path) {
         // load membin to place in the initial data memory
-        load_membin(initial_membin_path, getMEM());
+        FILE *fh = fopen(initial_membin_path, "r");
+        if (!fh) {
+            fprintf(stderr,
+                    "Can't open the specified initial membin file: %s\n",
+                    initial_membin_path);
+            exit(EXIT_FAILURE);
+        }
+        load_membin(fh);
     }
 
     int ninsts = 0;

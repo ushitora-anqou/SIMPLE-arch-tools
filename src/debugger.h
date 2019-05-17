@@ -21,6 +21,7 @@ int checkC();
 int checkV();
 // return 1 when HLT, return 0 otherwise.
 int stepEmu();
+void load_membin(FILE *fh);
 
 // asm.c
 void initialize_asm(FILE *srcfh);

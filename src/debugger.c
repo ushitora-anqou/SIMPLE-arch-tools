@@ -1,6 +1,8 @@
 #include "debugger.h"
 #include "utility.h"
 
+#include <getopt.h>
+
 #define INST_LENGTH 128
 static char insts[64 * 1024][INST_LENGTH];
 static int ninsts;
@@ -11,15 +13,53 @@ void load_insts(FILE *fh)
         ;
 }
 
+_Noreturn void print_usage_and_exit(char *argv0)
+{
+    fprintf(stderr,
+            "Usage: %s [-m initial-membin-path] "
+            "[target-assembly-file-path]\n",
+            argv0);
+    exit(EXIT_FAILURE);
+}
+
 int main(int argc, char **argv)
 {
-    assert(argc == 2);
-    FILE *fh = fopen(argv[1], "r");
-    assert(fh);
+    char *initial_membin_path = NULL;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "m:")) != -1) {
+        switch (opt) {
+        case 'm':
+            initial_membin_path = new_string(optarg);
+            break;
+        default:
+            print_usage_and_exit(argv[0]);
+        }
+    }
+
+    FILE *fh = NULL;
+    if (optind >= argc) print_usage_and_exit(argv[0]);
+    fh = fopen(argv[optind], "r");
+    if (!fh) {
+        fprintf(stderr, "Can't open the specified file: %s\n", argv[optind]);
+        exit(EXIT_FAILURE);
+    }
 
     initialize_asm(fh);
     assemble();
     initialize_emu(getIM());
+
+    if (initial_membin_path) {
+        // load membin to place in the initial data memory
+        FILE *fh = fopen(initial_membin_path, "r");
+        if (!fh) {
+            fprintf(stderr,
+                    "Can't open the specified initial membin file: %s\n",
+                    initial_membin_path);
+            exit(EXIT_FAILURE);
+        }
+        load_membin(fh);
+    }
 
     // TODO: assume asm won't use fh after assembling.
     rewind(fh);
