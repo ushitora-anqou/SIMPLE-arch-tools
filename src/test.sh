@@ -396,8 +396,8 @@ loop:
 #    HLT" 30
 
 test_macro "
-    MOV R0, 1
-    ADD R0, 2
+    MOV R0, 1   // comcom
+    ADD R0, 2   # comcom
     CMP R0, 3
     JE  exit
     MOV R0, 0
