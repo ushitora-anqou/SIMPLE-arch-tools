@@ -596,6 +596,21 @@ R3 = 7
 hoge
 HLT" 10
 
+test_macro "
+begin(hoge)
+    R0 = 0
+foo:
+    R0 += 1
+    if R0 <= 1 then goto foo
+end(hoge)
+
+begin(piyo)
+foo:
+    R0 += 1
+    if R0 <= 3 then goto foo
+end(piyo)
+HLT" 4
+
 test_macro_error() {
     res=$(echo "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null
@@ -621,5 +636,11 @@ define hoge" "3:8:.+macro with the same name"
 test_macro_error "JMP hoge" "Undeclared label.+hoge"
 
 test_macro_error "R1 += +=" "1:7:.+Unexpected token.+register"
+
+test_macro_error "end(hoge)" "1:1:.+Invalid end of label namespace"
+
+test_macro_error "begin(hoge) begin(foo)" "1:13:.+Nested label namespace is not allowed"
+
+test_macro_error "begin(hoge) end(foo)" "1:13:.+Invalid end of label namespace"
 
 echo "ok"

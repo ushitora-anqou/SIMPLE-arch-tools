@@ -209,6 +209,8 @@ struct Token_tag {
         T_COMMA,
         T_LBRACKET,
         T_RBRACKET,
+        T_LPAREN,
+        T_RPAREN,
         T_PLUS,
         T_MINUS,
         T_COLON,
@@ -230,6 +232,10 @@ struct Token_tag {
         K_IF,
         K_THEN,
         K_GOTO,
+        K_BEGIN,
+        K_END,
+        P_LABELNS_BEGIN,
+        P_LABELNS_END,
     } kind;
 
     union {
@@ -306,6 +312,10 @@ const char *token2str(Token *token)
         return "[";
     case T_RBRACKET:
         return "]";
+    case T_LPAREN:
+        return "(";
+    case T_RPAREN:
+        return ")";
     case T_PLUS:
         return "+";
     case T_PLUSEQ:
@@ -350,6 +360,14 @@ const char *token2str(Token *token)
         return "then";
     case K_GOTO:
         return "goto";
+    case K_BEGIN:
+        return "begin";
+    case K_END:
+        return "end";
+    case P_LABELNS_BEGIN:
+        return format("P_LABELNS_BEGIN(%s)", token->sval);
+    case P_LABELNS_END:
+        return format("P_LABELNS_END(%s)", token->sval);
     default:
         assert(0);
     }
@@ -368,6 +386,10 @@ const char *tokenkind2str(int kind)
         return "left bracket";
     case T_RBRACKET:
         return "right bracket";
+    case T_LPAREN:
+        return "left paren";
+    case T_RPAREN:
+        return "right paren";
     case T_PLUS:
         return "plus";
     case T_MINUS:
@@ -410,6 +432,14 @@ const char *tokenkind2str(int kind)
         return "keyword then";
     case K_GOTO:
         return "keyword goto";
+    case K_BEGIN:
+        return "keyword begin";
+    case K_END:
+        return "keyword end";
+    case P_LABELNS_BEGIN:
+        return "P_LABELNS_BEGIN";
+    case P_LABELNS_END:
+        return "P_LABELNS_END";
     default:
         assert(0);
     }
@@ -503,6 +533,14 @@ Token *next_token()
                 token->kind = K_GOTO;
                 return token;
             }
+            if (streql(sval, "begin")) {
+                token->kind = K_BEGIN;
+                return token;
+            }
+            if (streql(sval, "end")) {
+                token->kind = K_END;
+                return token;
+            }
 
             token->kind = T_IDENT;
             token->sval = new_string(sval);
@@ -563,6 +601,14 @@ Token *next_token()
 
         case ']':
             token->kind = T_RBRACKET;
+            break;
+
+        case '(':
+            token->kind = T_LPAREN;
+            break;
+
+        case ')':
+            token->kind = T_RPAREN;
             break;
 
         case '+': {
@@ -929,6 +975,36 @@ void preprocess()
             continue;
         }
 
+        if (match_token(K_BEGIN)) {
+            set_source_token_replaced(pop_token());
+
+            expect_token(T_LPAREN);
+            char *ns_name = expect_ident();
+            expect_token(T_RPAREN);
+
+            Token *ns_token = new_token(P_LABELNS_BEGIN);
+            ns_token->sval = ns_name;
+            vector_push_back(dst, ns_token);
+
+            set_source_token_replaced(NULL);
+            continue;
+        }
+
+        if (match_token(K_END)) {
+            set_source_token_replaced(pop_token());
+
+            expect_token(T_LPAREN);
+            char *ns_name = expect_ident();
+            expect_token(T_RPAREN);
+
+            Token *ns_token = new_token(P_LABELNS_END);
+            ns_token->sval = ns_name;
+            vector_push_back(dst, ns_token);
+
+            set_source_token_replaced(NULL);
+            continue;
+        }
+
         while (!pop_token_if(T_NEWLINE)) vector_push_back(dst, pop_token());
     }
 
@@ -967,6 +1043,7 @@ int main()
 {
     Map *labels = new_map();
     Vector *pending = new_vector();
+    char *label_namespace = NULL;
 
     emits = new_vector();
     input_tokens = new_vector();
@@ -975,6 +1052,26 @@ int main()
     preprocess();
 
     while (peek_token() != NULL) {
+        if (match_token(P_LABELNS_BEGIN)) {
+            Token *token = pop_token();
+            if (label_namespace != NULL)
+                failwith(token,
+                         "Nested label namespace is not allowed for now: new "
+                         "ns %s, but already declared %s",
+                         token->sval, label_namespace);
+            label_namespace = token->sval;
+            continue;
+        }
+        if (match_token(P_LABELNS_END)) {
+            Token *token = pop_token();
+            if (label_namespace == NULL ||
+                !streql(label_namespace, token->sval))
+                failwith(token, "Invalid end of label namespace: %s",
+                         token->sval);
+            label_namespace = NULL;
+            continue;
+        }
+
         Token *op_token = expect_token(T_IDENT);
         char *ident = op_token->sval;
 
@@ -1090,7 +1187,9 @@ int main()
                     continue;
                 }
 
-                char *label_name = new_string(expect_ident());
+                char *label_name = expect_ident();
+                if (label_namespace)
+                    label_name = format("%s::%s", label_namespace, label_name);
                 vector_push_back(pending,
                                  new_pair(label_name, (void *)emitted_size()));
                 emit(op_token, "%s", jump_ops_dst[i]);
@@ -1121,7 +1220,9 @@ int main()
         }
 
         // label
-        char *label_name = new_string(ident);
+        char *label_name = ident;
+        if (label_namespace)
+            label_name = format("%s::%s", label_namespace, ident);
         expect_token(T_COLON);
         map_insert(labels, label_name, (void *)emitted_size());
     }
