@@ -611,6 +611,35 @@ foo:
 end(piyo)
 HLT" 4
 
+test_macro "
+define hoge(a, b) ADD a, b
+R0 = 3
+R1 = 5
+hoge(R0, R1)
+HLT" 8
+
+test_macro "
+define hoge() ADD R0, R1
+R0 = 3
+R1 = 5
+hoge ()
+HLT" 8
+
+test_macro "
+define hoge(a) ADD a, a
+R0 = 3
+R1 = 5
+hoge (R0)
+HLT" 6
+
+test_macro "
+define addsub(a, b) ADD a, b MOV b, a SUB a, b
+R0 = 5
+R1 = 3
+addsub(R0, R1)
+HLT" 0
+
+
 test_macro_error() {
     res=$(echo "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null
@@ -642,5 +671,19 @@ test_macro_error "end(hoge)" "1:1:.+Invalid end of label namespace"
 test_macro_error "begin(hoge) begin(foo)" "1:13:.+Nested label namespace is not allowed"
 
 test_macro_error "begin(hoge) end(foo)" "1:13:.+Invalid end of label namespace"
+
+test_macro_error "
+define hoge (a, b) ADD a, b
+R0 = 3
+R1 = 5
+hoge(R0, R1)
+HLT" "5:1:.+Unexpected token.+'\('"
+
+test_macro_error "
+define addsub(a, b) ADD a, b MOV b, a SUB ,a
+R0 = 5
+R1 = 3
+addsub(R0, R1)
+HLT" "5:1:.+Unexpected token.+','"
 
 echo "ok"

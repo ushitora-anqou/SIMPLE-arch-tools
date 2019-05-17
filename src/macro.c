@@ -198,6 +198,10 @@ int get_prev_max_line_column()
     return strlen(get_prev_read_line());
 }
 
+typedef struct {
+    Vector *code, *params;
+} Macro;
+
 typedef struct Token_tag Token;
 struct Token_tag {
     int line_row, line_column;
@@ -287,6 +291,45 @@ void copy_tokens_updating_source(Vector *dst, Vector *src)
 
     for (int i = 0; i < vector_size(src); i++) {
         Token *token = dup_token((Token *)vector_get(src, i));
+
+        token->read_line = source_token_replaced->read_line;
+        token->line_row = source_token_replaced->line_row;
+        token->line_column = source_token_replaced->line_column;
+
+        vector_push_back(dst, token);
+    }
+}
+
+void copy_tokens_updating_source_with_args(Vector *dst, Macro *macro,
+                                           Vector *args)
+{
+    int nparams = vector_size(macro->params);
+    Map *param2arg = new_map();
+
+    assert(nparams == vector_size(args));
+
+    // create a map to convert parameters into arguments
+    for (int i = 0; i < nparams; i++) {
+        char *param = (char *)vector_get(macro->params, i);
+        Vector *arg = (Vector *)vector_get(args, i);
+        map_insert(param2arg, param, arg);
+    }
+
+    int code_size = vector_size(macro->code);
+    for (int i = 0; i < code_size; i++) {
+        Token *token = (Token *)vector_get(macro->code, i);
+        if (token->kind == T_IDENT) {
+            KeyValue *kv = map_lookup(param2arg, token->sval);
+            if (kv != NULL) {
+                // replace param with arg
+                Vector *arg = (Vector *)(kv->value);
+                for (int i = 0; i < vector_size(arg); i++)
+                    vector_push_back(dst,
+                                     dup_token((Token *)(vector_get(arg, i))));
+                continue;
+            }
+        }
+        token = dup_token(token);
 
         token->read_line = source_token_replaced->read_line;
         token->line_row = source_token_replaced->line_row;
@@ -813,6 +856,26 @@ void preprocess()
         if (pop_token_if(K_DEFINE)) {
             Token *ident_token = expect_token(T_IDENT);
             char *name = ident_token->sval;
+
+            // Parse parameters of macros.
+            // The beginning lparen should be exactly one character to the right
+            // of the macro's identifier without any space.
+            Vector *params = NULL;
+            if (match_token(T_LPAREN) &&
+                peek_token()->line_column ==
+                    ident_token->line_column + strlen(name)) {
+                pop_token();  // discard T_LPAREN
+
+                // parse macro parameters
+                params = new_vector();
+                if (!pop_token_if(T_RPAREN)) {
+                    vector_push_back(params, expect_ident());
+                    while (pop_token_if(T_COMMA))
+                        vector_push_back(params, expect_ident());
+                    expect_token(T_RPAREN);
+                }
+            }
+
             Vector *code = new_vector();
             while (peek_token() != NULL && !match_token(T_NEWLINE))
                 vector_push_back(code, pop_token());
@@ -822,7 +885,10 @@ void preprocess()
                 failwith(ident_token,
                          "Can't define macro with the same name: %s", name);
 
-            map_insert(macros, name, code);
+            Macro *macro = (Macro *)malloc(sizeof(Macro));
+            macro->code = code;
+            macro->params = params;
+            map_insert(macros, name, macro);
             continue;
         }
 
@@ -840,10 +906,44 @@ void preprocess()
             KeyValue *kv = map_lookup(macros, macro_ident->sval);
             if (kv != NULL) {
                 pop_token();  // discard the macro identifier
-                Vector *code = (Vector *)(kv->value);
+                Macro *macro = (Macro *)(kv->value);
 
                 set_source_token_replaced(macro_ident);
-                copy_tokens_updating_source(dst, code);
+
+                if (macro->params) {
+                    expect_token(T_LPAREN);
+
+                    Vector *args = new_vector();
+
+                    if (!pop_token_if(T_RPAREN)) {
+                        Vector *arg = new_vector();
+
+                        while (!match_token(T_COMMA) && !match_token(T_RPAREN))
+                            vector_push_back(arg, pop_token());
+                        vector_push_back(args, arg);  // push 1st arg
+
+                        while (pop_token_if(T_COMMA)) {
+                            arg = new_vector();
+                            while (!match_token(T_COMMA) &&
+                                   !match_token(T_RPAREN))
+                                vector_push_back(arg, pop_token());
+                            vector_push_back(args, arg);
+                        }
+
+                        expect_token(T_RPAREN);
+                    }
+
+                    if (vector_size(macro->params) != vector_size(args))
+                        failwith(macro_ident,
+                                 "Wrong number of arguments; got %d "
+                                 "argument(s), but expect %d one(s)",
+                                 vector_size(args), vector_size(macro->params));
+
+                    copy_tokens_updating_source_with_args(dst, macro, args);
+                }
+                else {
+                    copy_tokens_updating_source(dst, macro->code);
+                }
                 set_source_token_replaced(NULL);
 
                 continue;
