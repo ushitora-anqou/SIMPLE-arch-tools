@@ -254,8 +254,8 @@ MOV R0, [R1 + 1]
 HLT" 30
 
 test_macro "
-MOV R1, 10
-MOV R2, 20
+MOV R1, +10
+MOV R2, +20
 ADD R1, R2
 MOV [R1 - 1], R2
 MOV [R1 + 1], R1
@@ -715,5 +715,29 @@ R2 = 3
 R3 = 7
 hoge
 HLT" "10:3:.+Unexpected token.+','"
+
+test_macro_error "
+MOV R0, [R0 + 128]" "Unexpected token.+'128'.+-128, 127"
+
+test_macro_error "
+MOV R0, [R0 - 129]" "Unexpected token.+'-129'.+-128, 127"
+
+test_macro_error "
+ADD R0, 8" "Unexpected token.+'8'.+-8, 7"
+
+test_macro_error "
+ADD R0, -9" "Unexpected token.+'-9'.+-8, 7"
+
+test_macro_error "
+CMP R0, 8" "Unexpected token.+'8'.+-8, 7"
+
+test_macro_error "
+CMP R0, -9" "Unexpected token.+'-9'.+-8, 7"
+
+test_macro_error "
+SLL R0, 16" "Unexpected token.+'16'.+0, 15"
+
+test_macro_error "
+SLL R0, -1" "Unexpected token"
 
 echo "ok"

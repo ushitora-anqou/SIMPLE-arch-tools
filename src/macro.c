@@ -826,23 +826,31 @@ char *expect_ident()
     return token->sval;
 }
 
-int expect_integer(int min, int max)
+int expect_integer(int sign, int nbits)
 {
+    assert(sign == 0 || sign == 1);
+    assert(1 <= nbits && nbits <= 32);
+
     int mul = 1;
-    if (pop_token_if(T_MINUS))  //
+    if (pop_token_if(T_PLUS))
+        mul = 1;
+    else if (sign && pop_token_if(T_MINUS))
         mul = -1;
     Token *token = expect_token(T_INTEGER);
     int num = mul * token->ival;
 
+    int max = (1u << (nbits - sign)) - 1, min = sign ? -(1u << (nbits - 1)) : 0;
     if (num < min || max < num)
         failwith_unexpected_token(token, format("%d", num),
                                   format("number in [%d, %d]", min, max));
+
     return num;
 }
 
 int match_integer()
 {
-    return match_token(T_MINUS) || match_token(T_INTEGER);
+    return match_token(T_PLUS) || match_token(T_MINUS) ||
+           match_token(T_INTEGER);
 }
 
 void expect_mem(int *base_reg, int *disp)
@@ -851,10 +859,8 @@ void expect_mem(int *base_reg, int *disp)
     expect_token(T_LBRACKET);
     *base_reg = expect_token(T_REGISTER)->ival;
     *disp = 0;
-    if (pop_token_if(T_PLUS))
-        *disp = expect_integer(-128, 127);
-    else if (match_token(T_MINUS))
-        *disp = expect_integer(-128, 127);
+    if (match_token(T_PLUS) || match_token(T_MINUS))
+        *disp = expect_integer(1, 8);
     expect_token(T_RBRACKET);
 }
 
@@ -1203,7 +1209,7 @@ int main()
 
             if (match_integer()) {
                 // MOV Rn, imm
-                int src_imm = expect_integer(-128, 127);
+                int src_imm = expect_integer(1, 8);
                 emit(op_token, "LI R%d, %d", dst_reg, src_imm);
                 continue;
             }
@@ -1228,7 +1234,7 @@ int main()
 
             if (match_integer()) {
                 // ADD Rn, imm -> ADDI Rn, imm
-                int src_imm = expect_integer(-8, 7);
+                int src_imm = expect_integer(1, 4);
                 emit(op_token, "ADDI R%d, %d", dst_reg, src_imm);
                 continue;
             }
@@ -1245,7 +1251,7 @@ int main()
 
             if (match_integer()) {
                 // CMP Rn, imm -> CMPI Rn, imm
-                int src_imm = expect_integer(-8, 7);
+                int src_imm = expect_integer(1, 4);
                 emit(op_token, "CMPI R%d, %d", dst_reg, src_imm);
                 continue;
             }
@@ -1280,7 +1286,7 @@ int main()
                 char *op = simple_ops_reg_imm[i];
                 int dst_reg = expect_token(T_REGISTER)->ival;
                 expect_token(T_COMMA);
-                int src_imm = expect_integer(0, 15);
+                int src_imm = expect_integer(0, 4);
                 emit(op_token, "%s R%d, %d", op, dst_reg, src_imm);
                 continue;
             }
@@ -1294,7 +1300,7 @@ int main()
                 if (streql(ident, jump_ops_src[i])) break;
             if (i < size) {
                 if (match_integer()) {
-                    int d = expect_integer(0, 15);
+                    int d = expect_integer(1, 8);
                     emit(op_token, "%s %d", jump_ops_dst[i], d);
                     continue;
                 }
