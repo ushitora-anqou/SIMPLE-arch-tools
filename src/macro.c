@@ -999,8 +999,11 @@ void preprocess()
             int op_kind = token->kind;
 
             // right hand side
-            while (!match_token(T_NEWLINE)) vector_push_back(rhs, pop_token());
-            expect_token(T_NEWLINE);
+            if (match_token(T_LBRACKET)) {
+                while (!match_token(T_RBRACKET))
+                    vector_push_back(rhs, pop_token());
+            }
+            vector_push_back(rhs, pop_token());
 
             // generate code
             switch (op_kind) {

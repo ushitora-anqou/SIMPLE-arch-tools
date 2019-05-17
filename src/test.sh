@@ -739,8 +739,7 @@ define hoge" "3:8:.+macro with the same name"
 
 test_macro_error "JMP hoge" "Undeclared label.+hoge"
 
-test_macro_error "R1 += +=
-" "1:7:.+Unexpected token.+register"
+test_macro_error "R1 += +=" "1:7:.+Unexpected token.+register"
 
 test_macro_error "end(hoge)" "1:1:.+Invalid end of label namespace"
 
