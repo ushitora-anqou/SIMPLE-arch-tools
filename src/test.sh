@@ -686,6 +686,81 @@ loop:
 
 test_macro "LI R0, 10 HLT  #\n" 10
 
+test_macro "
+inline hoge(a, b) {
+    a += b
+}
+R0 = 5
+R1 = 10
+hoge(R0, R1)
+HLT" 15
+
+test_macro "
+inline hoge(a, b) {
+loop:
+    a += b
+	if a <= b then goto loop
+}
+R0 = 5
+R1 = 10
+hoge(R0, R1)
+R1 = R0
+hoge(R0, R1)
+HLT" 30
+
+test_macro "
+inline fibstep() {
+    R3 = R0
+    R0 = R1
+    R1 += R3
+}
+
+    define MAX 55
+    define A0 0
+    define A1 1
+
+    R0 = A0
+    R1 = A1
+    R4 = MAX
+loop:
+    fibstep()
+    if R0 < R4 then goto loop
+exit:
+    HLT" 55
+
+test_macro "
+inline main() {
+    define SP_BASE 0x10
+    define A0 0
+    define A1 1
+    define LIMIT 55
+
+    R7 = SP_BASE
+    R0 = A0
+    [R7 + 0] = R0
+    R0 = A1
+    [R7 + 1] = R0
+    R0 = LIMIT
+    [R7 + 2] = R0
+
+loop:
+    R0 = [R7 + 0]
+    R1 = [R7 + 2]
+    if R1 <= R0 then goto exit
+    R1 = [R7 + 1]
+    [R7 + 0] = R1
+    R0 += R1
+    [R7 + 1] = R0
+    goto loop
+
+exit:
+    HLT
+}
+
+    main()
+" 55
+
+
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null

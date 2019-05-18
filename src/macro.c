@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "utility.h"
 
 typedef struct Token_tag Token;
@@ -222,6 +223,8 @@ struct Token_tag {
         T_COMMA,
         T_LBRACKET,
         T_RBRACKET,
+        T_LBRACE,
+        T_RBRACE,
         T_LPAREN,
         T_RPAREN,
         T_PLUS,
@@ -247,6 +250,7 @@ struct Token_tag {
         K_GOTO,
         K_BEGIN,
         K_END,
+        K_INLINE,
         P_LABELNS_BEGIN,
         P_LABELNS_END,
     } kind;
@@ -325,6 +329,10 @@ const char *token2str(Token *token)
         return "[";
     case T_RBRACKET:
         return "]";
+    case T_LBRACE:
+        return "{";
+    case T_RBRACE:
+        return "}";
     case T_LPAREN:
         return "(";
     case T_RPAREN:
@@ -377,6 +385,8 @@ const char *token2str(Token *token)
         return "begin";
     case K_END:
         return "end";
+    case K_INLINE:
+        return "inline";
     case P_LABELNS_BEGIN:
         return format("P_LABELNS_BEGIN(%s)", token->sval);
     case P_LABELNS_END:
@@ -399,6 +409,10 @@ const char *tokenkind2str(int kind)
         return "left bracket";
     case T_RBRACKET:
         return "right bracket";
+    case T_LBRACE:
+        return "left brace";
+    case T_RBRACE:
+        return "right brace";
     case T_LPAREN:
         return "left paren";
     case T_RPAREN:
@@ -449,6 +463,8 @@ const char *tokenkind2str(int kind)
         return "keyword begin";
     case K_END:
         return "keyword end";
+    case K_INLINE:
+        return "keyword inline";
     case P_LABELNS_BEGIN:
         return "P_LABELNS_BEGIN";
     case P_LABELNS_END:
@@ -554,6 +570,10 @@ Token *next_token()
                 token->kind = K_END;
                 return token;
             }
+            if (streql(sval, "inline")) {
+                token->kind = K_INLINE;
+                return token;
+            }
 
             token->kind = T_IDENT;
             token->sval = new_string(sval);
@@ -616,6 +636,13 @@ Token *next_token()
             token->kind = T_RBRACKET;
             break;
 
+        case '{':
+            token->kind = T_LBRACE;
+            break;
+
+        case '}':
+            token->kind = T_RBRACE;
+            break;
         case '(':
             token->kind = T_LPAREN;
             break;
@@ -821,11 +848,40 @@ void expect_mem(int *base_reg, int *disp)
     expect_token(T_RBRACKET);
 }
 
+Token *new_labelns_begin(char *ns_name)
+{
+    Token *token = new_token(P_LABELNS_BEGIN);
+    token->sval = ns_name;
+    return token;
+}
+
+Token *new_labelns_end(char *ns_name)
+{
+    Token *token = new_token(P_LABELNS_END);
+    token->sval = ns_name;
+    return token;
+}
+
+char *create_temporary_ns_name(void)
+{
+    // TODO: use more random way
+    static char src_chars[] =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    char buf[2 + 20 + 1] = "::";
+    for (int i = 0; i < sizeof(buf) - (2 + 1); i++)
+        buf[i + 2] = src_chars[rand() % sizeof(src_chars)];
+    return new_string(buf);
+}
+
+typedef struct {
+    Vector *params, *body;
+} Inline;
+
 void preprocess()
 {
     Vector *dst = NULL;
 
-    // Phase 1: define and expand macros
+    // Phase 1.1: define and expand macros
     dst = new_vector();
     Map *macros = new_map();
     while (peek_token() != NULL) {
@@ -872,6 +928,99 @@ void preprocess()
         vector_push_back(dst, pop_token());
     }
     free(macros);
+
+    // set new tokens
+    input_tokens = dst;
+    input_tokens_npos = 0;
+
+    // Phase 1.2: define and expand inlines
+    dst = new_vector();
+    Map *inlines = new_map();
+    while (peek_token() != NULL) {
+        if (pop_token_if(K_INLINE)) {
+            char *inline_name = expect_ident();
+            expect_token(T_LPAREN);
+            Vector *params = new_vector();
+            if (!pop_token_if(T_RPAREN)) {
+                vector_push_back(params, expect_ident());
+                while (pop_token_if(T_COMMA))
+                    vector_push_back(params, expect_ident());
+                expect_token(T_RPAREN);
+            }
+            expect_token(T_LBRACE);
+            Vector *body = new_vector();
+            while (!pop_token_if(T_RBRACE)) vector_push_back(body, pop_token());
+
+            Inline *inl = (Inline *)malloc(sizeof(Inline));
+            inl->params = params;
+            inl->body = body;
+            map_insert(inlines, inline_name, inl);
+            continue;
+        }
+
+        if (match_token(T_IDENT)) {
+            Token *inline_ident = peek_token();
+            KeyValue *kv = map_lookup(inlines, inline_ident->sval);
+            if (kv != NULL) {
+                pop_token();  // discard inline identifier
+
+                // parse inline's arguments
+                Vector *args = new_vector();
+                expect_token(T_LPAREN);
+                if (!pop_token_if(T_RPAREN)) {
+                    do {
+                        Vector *arg = new_vector();
+                        while (!match_token(T_RPAREN) && !match_token(T_COMMA))
+                            vector_push_back(arg, pop_token());
+                        vector_push_back(args, arg);
+                    } while (pop_token_if(T_COMMA));
+                    expect_token(T_RPAREN);
+                }
+
+                // check if #args is correct
+                Inline *inl = (Inline *)(kv->value);
+                if (vector_size(args) != vector_size(inl->params))
+                    failwith(inline_ident,
+                             "Wrong number of arguments for inline %s",
+                             inline_ident->sval);
+
+                // create a map to correspond params with args
+                Map *param2arg = new_map();
+                for (int i = 0; i < vector_size(args); i++) {
+                    Vector *arg = (Vector *)vector_get(args, i);
+                    char *param = (char *)vector_get(inl->params, i);
+                    map_insert(param2arg, param, arg);
+                }
+
+                // expand inline
+                char *tmp_ns_name = create_temporary_ns_name();
+                vector_push_back(dst, new_labelns_begin(tmp_ns_name));
+                for (int i = 0; i < vector_size(inl->body); i++) {
+                    Token *token = vector_get(inl->body, i);
+                    if (token->kind == T_IDENT) {
+                        KeyValue *kv = map_lookup(param2arg, token->sval);
+                        if (kv != NULL) {
+                            // expand arguments
+                            Vector *tokens = (Vector *)(kv->value);
+                            for (int i = 0; i < vector_size(tokens); i++)
+                                vector_push_back(
+                                    dst, (Token *)vector_get(tokens, i));
+
+                            continue;
+                        }
+                    }
+                    vector_push_back(dst, token);
+                }
+                vector_push_back(dst, new_labelns_end(tmp_ns_name));
+
+                free(param2arg);
+
+                continue;
+            }
+        }
+
+        vector_push_back(dst, pop_token());
+    }
 
     // set new tokens
     input_tokens = dst;
@@ -1003,9 +1152,7 @@ void preprocess()
             char *ns_name = expect_ident();
             expect_token(T_RPAREN);
 
-            Token *ns_token = new_token(P_LABELNS_BEGIN);
-            ns_token->sval = ns_name;
-            vector_push_back(dst, ns_token);
+            vector_push_back(dst, new_labelns_begin(ns_name));
 
             set_source_token_replaced(NULL);
             continue;
@@ -1018,9 +1165,7 @@ void preprocess()
             char *ns_name = expect_ident();
             expect_token(T_RPAREN);
 
-            Token *ns_token = new_token(P_LABELNS_END);
-            ns_token->sval = ns_name;
-            vector_push_back(dst, ns_token);
+            vector_push_back(dst, new_labelns_end(ns_name));
 
             set_source_token_replaced(NULL);
             continue;
@@ -1063,6 +1208,8 @@ int emitted_size()
 
 int main()
 {
+    srand((unsigned int)time(NULL));
+
     Map *labels = new_map();
     Vector *pending = new_vector();
     char *label_namespace = NULL;
