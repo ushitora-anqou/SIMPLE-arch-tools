@@ -321,14 +321,11 @@ void copy_tokens_updating_source(Vector *dst, Vector *src)
 
 const char *token2str(Token *token)
 {
-    static char buf[128];
     switch (token->kind) {
     case T_IDENT:
         return token->sval;
     case T_INTEGER:
-        // TODO: returned pointer is not malloc-ed.
-        sprintf(buf, "%d", token->ival);
-        return buf;
+        return format("%d", token->ival);
     case T_COMMA:
         return ",";
     case T_LBRACKET:
@@ -368,9 +365,7 @@ const char *token2str(Token *token)
     case T_COLON:
         return ":";
     case T_REGISTER:
-        // TODO: returned pointer is not malloc-ed.
-        sprintf(buf, "R%d", token->ival);
-        return buf;
+        return format("R%d", token->ival);
     case T_NEWLINE:
         return "newline";
     case T_EQ:
@@ -397,9 +392,8 @@ const char *token2str(Token *token)
         return format("P_LABELNS_BEGIN(%s)", token->sval);
     case P_LABELNS_END:
         return format("P_LABELNS_END(%s)", token->sval);
-    default:
-        assert(0);
     }
+    assert(0);
 }
 
 const char *tokenkind2str(int kind)
@@ -409,75 +403,48 @@ const char *tokenkind2str(int kind)
         return "identifier";
     case T_INTEGER:
         return "integer";
-    case T_COMMA:
-        return "comma";
-    case T_LBRACKET:
-        return "left bracket";
-    case T_RBRACKET:
-        return "right bracket";
-    case T_LBRACE:
-        return "left brace";
-    case T_RBRACE:
-        return "right brace";
-    case T_LPAREN:
-        return "left paren";
-    case T_RPAREN:
-        return "right paren";
-    case T_PLUS:
-        return "plus";
-    case T_MINUS:
-        return "minus";
-    case T_COLON:
-        return "colon";
     case T_REGISTER:
         return "register";
-    case T_NEWLINE:
-        return "newline";
-    case T_EQ:
-        return "equal";
-    case T_EQEQ:
-        return "==";
-    case T_PLUSEQ:
-        return "+=";
-    case T_NEQ:
-        return "!=";
-    case T_LT:
-        return "<";
-    case T_LTEQ:
-        return "<=";
-    case T_MINUSEQ:
-        return "-=";
-    case T_LTLTEQ:
-        return "<<=";
-    case T_GTGTEQ:
-        return ">>=";
-    case T_ANDEQ:
-        return "&=";
-    case T_OREQ:
-        return "|=";
-    case K_DEFINE:
-        return "keyword define";
-    case K_UNDEF:
-        return "keyword undef";
-    case K_IF:
-        return "keyword if";
-    case K_THEN:
-        return "keyword then";
-    case K_GOTO:
-        return "keyword goto";
-    case K_BEGIN:
-        return "keyword begin";
-    case K_END:
-        return "keyword end";
-    case K_INLINE:
-        return "keyword inline";
     case P_LABELNS_BEGIN:
         return "P_LABELNS_BEGIN";
     case P_LABELNS_END:
         return "P_LABELNS_END";
-    default:
-        assert(0);
+
+    case T_COMMA:
+    case T_LBRACKET:
+    case T_RBRACKET:
+    case T_LBRACE:
+    case T_RBRACE:
+    case T_LPAREN:
+    case T_RPAREN:
+    case T_PLUS:
+    case T_MINUS:
+    case T_COLON:
+    case T_NEWLINE:
+    case T_EQ:
+    case T_EQEQ:
+    case T_PLUSEQ:
+    case T_NEQ:
+    case T_LT:
+    case T_LTEQ:
+    case T_MINUSEQ:
+    case T_LTLTEQ:
+    case T_GTGTEQ:
+    case T_ANDEQ:
+    case T_OREQ:
+    case K_DEFINE:
+    case K_UNDEF:
+    case K_IF:
+    case K_THEN:
+    case K_GOTO:
+    case K_BEGIN:
+    case K_END:
+    case K_INLINE: {
+        Token token = {.kind = kind};
+        return token2str(&token);
     }
+    }
+    assert(0);
 }
 
 _Noreturn void failwith(Token *cause, const char *msg, ...)
