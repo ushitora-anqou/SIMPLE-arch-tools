@@ -869,7 +869,8 @@ char *create_temporary_ns_name(void)
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     char buf[2 + 20 + 1] = "::";
     for (int i = 0; i < sizeof(buf) - (2 + 1); i++)
-        buf[i + 2] = src_chars[rand() % sizeof(src_chars)];
+        buf[i + 2] = src_chars[rand() % (sizeof(src_chars) - 1)];
+    buf[sizeof(buf) - 1] = '\0';
     return new_string(buf);
 }
 
