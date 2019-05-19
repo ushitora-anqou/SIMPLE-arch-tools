@@ -7,11 +7,11 @@ static Word im[64 * 1024];
 
 int main(int argc, char **argv)
 {
-    int quiet_flag = 0, memdump_flag = 0;
+    int quiet_flag = 0, memdump_flag = 0, force_flag = 0;
     char *initial_membin_path = NULL;
 
     int opt;
-    while ((opt = getopt(argc, argv, "qdm:")) != -1) {
+    while ((opt = getopt(argc, argv, "qdfm:")) != -1) {
         switch (opt) {
         case 'q':
             quiet_flag = 1;
@@ -19,11 +19,15 @@ int main(int argc, char **argv)
         case 'd':
             memdump_flag = 1;
             break;
+        case 'f':
+            force_flag = 1;
+            break;
         case 'm':
             initial_membin_path = new_string(optarg);
             break;
         default:
-            fprintf(stderr, "Usage: %s [-q] [-d] [-m initial-membin-path]\n",
+            fprintf(stderr,
+                    "Usage: %s [-q] [-d] [-f] [-m initial-membin-path]\n",
                     argv[0]);
             exit(EXIT_FAILURE);
         }
@@ -36,6 +40,8 @@ int main(int argc, char **argv)
         // TODO: assume that SIMPLE arch is big endian.
         im[i++] = ((Word)ch << 8) | (Word)ch2;
     }
+    // set 0xBEEF pattern to the rest of IM to find SEGV at runtime
+    for (; i < sizeof(im) / sizeof(Word); i++) im[i] = 0xBEEF;
 
     initialize_emu(im);
 
@@ -52,11 +58,22 @@ int main(int argc, char **argv)
     }
 
     int ninsts = 0;
-    while (!stepEmu()) ninsts++;
+    while (!stepEmu()) {
+        ninsts++;
+        if (!force_flag && *getPC() == 0xBEEF) {
+            fprintf(
+                stderr,
+                "Potentially invalid instruction (0xBEEF) was detected. "
+                "Maybe you forgot to use HLT in your program. If you really "
+                "want to force to continue, set command-line option "
+                "'-f'.\n");
+            exit(EXIT_FAILURE);
+        }
+    }
 
     if (memdump_flag) {
         Word *mem = getMEM();
-        for (int i = 0; i < 0x2400; i++) printf("%04X : %04X\n", i, mem[i]);
+        for (int i = 0; i < 0x2C00; i++) printf("%04X : %04X\n", i, mem[i]);
     }
 
     if (!quiet_flag) printf("#insts: %d\n", ninsts);
