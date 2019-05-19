@@ -760,6 +760,25 @@ exit:
     main()
 " 55
 
+test_macro "
+begin(hoge)
+label:
+    R0 = 1
+    begin(piyo)
+    label:
+        begin(foo)
+        label:
+            R0 += 1
+            begin(bar)
+            label:
+            end(bar)
+        end(foo)
+        if R0 <= 5 then goto label
+    end(piyo)
+end(hoge)
+HLT
+" 6
+
 
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
@@ -789,8 +808,6 @@ test_macro_error "JMP hoge" "Undeclared label.+hoge"
 test_macro_error "R1 += +=" "1:7:.+Unexpected token.+register"
 
 test_macro_error "end(hoge)" "1:1:.+Invalid end of label namespace"
-
-test_macro_error "begin(hoge) begin(foo)" "1:13:.+Nested label namespace is not allowed"
 
 test_macro_error "begin(hoge) end(foo)" "1:13:.+Invalid end of label namespace"
 

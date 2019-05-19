@@ -39,6 +39,12 @@ void vector_push_back(Vector *vec, void *item)
     vec->data[vec->size++] = item;
 }
 
+void *vector_pop_back(Vector *vec)
+{
+    if (vec->size == 0) return NULL;
+    return vec->data[--vec->size];
+}
+
 void *vector_get(Vector *vec, int i)
 {
     if (i >= vec->size) return NULL;
@@ -1212,7 +1218,7 @@ int main()
     srand((unsigned int)time(NULL));
 
     Map *labels = new_map();
-    Vector *pending = new_vector();
+    Vector *pending = new_vector(), *labelns_stack = new_vector();
     char *label_namespace = NULL;
 
     emits = new_vector();
@@ -1224,21 +1230,15 @@ int main()
     while (peek_token() != NULL) {
         if (match_token(P_LABELNS_BEGIN)) {
             Token *token = pop_token();
-            if (label_namespace != NULL)
-                failwith(token,
-                         "Nested label namespace is not allowed for now: new "
-                         "ns %s, but already declared %s",
-                         token->sval, label_namespace);
-            label_namespace = token->sval;
+            vector_push_back(labelns_stack, token->sval);
             continue;
         }
         if (match_token(P_LABELNS_END)) {
             Token *token = pop_token();
-            if (label_namespace == NULL ||
-                !streql(label_namespace, token->sval))
+            char *ns_name = vector_pop_back(labelns_stack);
+            if (ns_name == NULL || !streql(ns_name, token->sval))
                 failwith(token, "Invalid end of label namespace: %s",
                          token->sval);
-            label_namespace = NULL;
             continue;
         }
 
@@ -1360,8 +1360,13 @@ int main()
                 }
 
                 char *label_name = expect_ident();
-                if (label_namespace)
-                    label_name = format("%s::%s", label_namespace, label_name);
+                int labelns_stack_size = vector_size(labelns_stack);
+                if (labelns_stack_size >= 1)
+                    label_name =
+                        format("%s::%s",
+                               (char *)vector_get(labelns_stack,
+                                                  labelns_stack_size - 1),
+                               label_name);
                 vector_push_back(pending,
                                  new_pair(label_name, (void *)emitted_size()));
                 emit(op_token, "%s", jump_ops_dst[i]);
@@ -1428,8 +1433,12 @@ int main()
 
         // label
         char *label_name = ident;
-        if (label_namespace)
-            label_name = format("%s::%s", label_namespace, ident);
+        int labelns_stack_size = vector_size(labelns_stack);
+        if (labelns_stack_size >= 1)
+            label_name = format(
+                "%s::%s",
+                (char *)vector_get(labelns_stack, labelns_stack_size - 1),
+                ident);
         expect_token(T_COLON);
         map_insert(labels, label_name, (void *)emitted_size());
     }
