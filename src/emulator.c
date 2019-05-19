@@ -56,7 +56,7 @@ int main(int argc, char **argv)
 
     if (memdump_flag) {
         Word *mem = getMEM();
-        for (int i = 0; i < 0x1C00; i++) printf("%04X : %04X\n", i, mem[i]);
+        for (int i = 0; i < 0x2400; i++) printf("%04X : %04X\n", i, mem[i]);
     }
 
     if (!quiet_flag) printf("#insts: %d\n", ninsts);
