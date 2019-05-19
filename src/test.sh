@@ -816,6 +816,44 @@ inline main() {
 main()
 halt" 30
 
+test_macro "
+alloc hoge R2
+alloc piyo R1
+alloc fuga R0
+
+fuga = 3
+piyo = 5
+hoge = 7
+
+piyo += hoge
+fuga += piyo
+
+halt
+" 15
+
+test_macro "
+alloc max R3
+alloc a0  R0
+alloc a1  R1
+
+inline fibstep() {
+alloc tmp R2
+
+    tmp = a0
+    a0 = a1
+    a1 += tmp
+}
+
+max = 55
+a0 = 0
+a1 = 1
+
+loop:
+    fibstep()
+    if a0 < max then goto loop
+exit:
+    halt" 55
+
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null
@@ -892,5 +930,45 @@ SLL R0, 16" "Unexpected token.+'16'.+0, 15"
 
 test_macro_error "
 SLL R0, -1" "Unexpected token"
+
+test_macro_error "
+alloc hoge R2
+alloc piyo R1
+alloc fuga R0
+
+alloc hoge R3
+" ":6:1:.+allocated.+hoge"
+
+test_macro_error "
+alloc hoge R2
+alloc piyo R1
+alloc fuga R0
+
+alloc hoge2 R1
+" ":6:1:.+R1.+hoge2.+piyo"
+
+test_macro_error "
+alloc max R3
+alloc a0  R0
+alloc a1  R1
+
+inline fibstep() {
+alloc tmp R2
+alloc hoge  R0
+
+    tmp = a0
+    a0 = a1
+    a1 += tmp
+}
+
+max = 55
+a0 = 0
+a1 = 1
+
+loop:
+    fibstep()
+    if a0 < max then goto loop
+exit:
+    halt" ":8:1.+R0.+hoge.+a0"
 
 echo "ok"
