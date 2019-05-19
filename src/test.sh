@@ -776,7 +776,7 @@ label:
         if R0 <= 5 then goto label
     end(piyo)
 end(hoge)
-HLT
+halt
 " 6
 
 test_macro "
@@ -795,7 +795,7 @@ inline main() {
 }
 
 main()
-HLT
+halt
 " 12
 
 test_macro "
@@ -814,7 +814,7 @@ inline main() {
 }
 
 main()
-HLT" 30
+halt" 30
 
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)

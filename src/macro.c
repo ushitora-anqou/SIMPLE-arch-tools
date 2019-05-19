@@ -257,6 +257,7 @@ struct Token_tag {
         K_BEGIN,
         K_END,
         K_INLINE,
+        K_HALT,
         P_LABELNS_BEGIN,
         P_LABELNS_END,
     } kind;
@@ -388,6 +389,8 @@ const char *token2str(Token *token)
         return "end";
     case K_INLINE:
         return "inline";
+    case K_HALT:
+        return "halt";
     case P_LABELNS_BEGIN:
         return format("P_LABELNS_BEGIN(%s)", token->sval);
     case P_LABELNS_END:
@@ -439,7 +442,8 @@ const char *tokenkind2str(int kind)
     case K_GOTO:
     case K_BEGIN:
     case K_END:
-    case K_INLINE: {
+    case K_INLINE:
+    case K_HALT: {
         Token token = {.kind = kind};
         return token2str(&token);
     }
@@ -545,6 +549,10 @@ Token *next_token()
             }
             if (streql(sval, "inline")) {
                 token->kind = K_INLINE;
+                return token;
+            }
+            if (streql(sval, "halt")) {
+                token->kind = K_HALT;
                 return token;
             }
 
@@ -1142,6 +1150,12 @@ void preprocess()
 
             set_source_token_replaced(NULL);
             continue;
+        }
+
+        if (match_token(K_HALT)) {
+            set_source_token_replaced(pop_token());
+            vector_push_back(dst, new_ident("HLT"));
+            set_source_token_replaced(NULL);
         }
 
         if (match_token(K_BEGIN)) {
