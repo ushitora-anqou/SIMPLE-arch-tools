@@ -854,6 +854,48 @@ loop:
 exit:
     halt" 55
 
+test_macro "
+inline mov(a, b) {
+    a = b
+}
+
+inline add(a, b) {
+	a += b
+}
+
+inline addmov(a, b) {
+	add(a, b)
+	mov(a, b)
+}
+
+R0 = 3
+R1 = 5
+addmov(R0, R1)
+halt" 5
+
+test_macro "
+inline mov(a, b) {
+    a = b
+}
+
+inline add(a, b) {
+	a += b
+}
+
+inline twoinsts(a, b) {
+    a
+    b
+}
+
+R0 = 3
+R1 = 5
+twoinsts(
+    add(R0, R1),
+    mov(R0, R1)
+)
+halt" 5
+
+
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null

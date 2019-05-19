@@ -885,9 +885,143 @@ AllocTable *new_alloc_table()
     return tbl;
 }
 
+static AllocTable *global_alloc;
+
+void preprocess_phase2(Vector *src, Vector *dst, Map *param2arg);
+void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
+                              Map *param2arg)
+{
+    // match inline definition
+    if (pop_token_if(K_INLINE)) {
+        char *inline_name = expect_ident();
+        expect_token(T_LPAREN);
+        Vector *params = new_vector();
+        if (!pop_token_if(T_RPAREN)) {
+            vector_push_back(params, expect_ident());
+            while (pop_token_if(T_COMMA))
+                vector_push_back(params, expect_ident());
+            expect_token(T_RPAREN);
+        }
+        expect_token(T_LBRACE);
+        Vector *body = new_vector();
+        while (!pop_token_if(T_RBRACE)) vector_push_back(body, pop_token());
+
+        Inline *inl = (Inline *)malloc(sizeof(Inline));
+        inl->params = params;
+        inl->body = body;
+        map_insert(inlines, inline_name, inl);
+        return;
+    }
+
+    // match register allocation
+    if (match_token(K_ALLOC)) {
+        Token *alloc_token = pop_token();
+        char *ident = expect_ident();
+        int reg_index = expect_token(T_REGISTER)->ival;
+
+        if (map_lookup(local_alloc->name2reg, ident) ||
+            map_lookup(global_alloc->name2reg, ident))
+            failwith(alloc_token, "Already allocated name " HL_IDENT, ident);
+        if (local_alloc->reg2name[reg_index] != NULL)
+            failwith(alloc_token,
+                     "You're allocating register " HL_REG " for " HL_IDENT
+                     ", which has already been allocated for " HL_IDENT,
+                     reg_index, ident, local_alloc->reg2name[reg_index]);
+        if (global_alloc->reg2name[reg_index] != NULL)
+            failwith(alloc_token,
+                     "You're allocating register " HL_REG " for " HL_IDENT
+                     ", which has already been allocated for " HL_IDENT,
+                     reg_index, ident, global_alloc->reg2name[reg_index]);
+
+        map_insert(local_alloc->name2reg, ident, (void *)reg_index);
+        local_alloc->reg2name[reg_index] = ident;
+        return;
+    }
+
+    if (!match_token(T_IDENT)) {
+        vector_push_back(dst, pop_token());
+        return;
+    }
+
+    Token *ident_token = pop_token();  // expect T_IDENT
+    char *ident = ident_token->sval;
+    KeyValue *kv = NULL;
+
+    // check if the identifier is a name to which a register has been
+    // allocated to locally or globally
+    kv = map_lookup(local_alloc->name2reg, ident);
+    if (kv == NULL) kv = map_lookup(global_alloc->name2reg, ident);
+    if (kv) {  // if found
+        set_source_token_replaced(ident_token);
+        Token *token = new_token(T_REGISTER);
+        token->ival = (int)kv->value;
+        vector_push_back(dst, token);
+        set_source_token_replaced(NULL);
+        return;
+    }
+
+    // match argument expansion
+    if (param2arg) {
+        kv = map_lookup(param2arg, ident);
+        if (kv) {  // if found
+            // expand arguments
+            Vector *tokens = (Vector *)(kv->value);
+            for (int i = 0; i < vector_size(tokens); i++)
+                vector_push_back(dst, (Token *)vector_get(tokens, i));
+
+            return;
+        }
+    }
+
+    // match inline expansion
+    kv = map_lookup(inlines, ident);
+    if (kv) {  // if found
+        // parse inline's arguments
+        Vector *args = new_vector();
+        expect_token(T_LPAREN);
+        if (!pop_token_if(T_RPAREN)) {
+            do {
+                Vector *arg = new_vector();
+                while (!match_token(T_RPAREN) && !match_token(T_COMMA))
+                    preprocess_phase2_detail(arg, local_alloc, param2arg);
+                vector_push_back(args, arg);
+            } while (pop_token_if(T_COMMA));
+            expect_token(T_RPAREN);
+        }
+
+        // check if #args is correct
+        Inline *inl = (Inline *)(kv->value);
+        if (vector_size(args) != vector_size(inl->params))
+            failwith(ident_token, "Wrong number of arguments for inline %s",
+                     ident);
+
+        // create a map to correspond params with args
+        Map *param2arg = new_map();
+        for (int i = 0; i < vector_size(args); i++) {
+            Vector *arg = (Vector *)vector_get(args, i);
+            char *param = (char *)vector_get(inl->params, i);
+            map_insert(param2arg, param, arg);
+        }
+
+        free(args);
+
+        // expand inline
+        char *tmp_ns_name = create_temporary_ns_name();
+        vector_push_back(dst, new_labelns_begin(tmp_ns_name));
+        preprocess_phase2(inl->body, dst, param2arg);
+        vector_push_back(dst, new_labelns_end(tmp_ns_name));
+
+        free(param2arg);
+
+        return;
+    }
+
+    // normal identifier
+    vector_push_back(dst, ident_token);
+}
+
 // copy tokens from src to dst, expanding inlines if any
-void preprocess_phase2(Vector *src, Vector *dst, AllocTable *global_alloc,
-                       Map *param2arg)
+void preprocess_phase2(Vector *src, Vector *dst, Map *param2arg)
 {
     // save input_tokens
     Vector *org_input_tokens = input_tokens;
@@ -896,142 +1030,11 @@ void preprocess_phase2(Vector *src, Vector *dst, AllocTable *global_alloc,
     input_tokens_npos = 0;
 
     AllocTable *local_alloc = new_alloc_table();
+    if (global_alloc == NULL) global_alloc = local_alloc;
 
     // start to copy tokens
-    while (peek_token() != NULL) {
-        // match inline definition
-        if (pop_token_if(K_INLINE)) {
-            char *inline_name = expect_ident();
-            expect_token(T_LPAREN);
-            Vector *params = new_vector();
-            if (!pop_token_if(T_RPAREN)) {
-                vector_push_back(params, expect_ident());
-                while (pop_token_if(T_COMMA))
-                    vector_push_back(params, expect_ident());
-                expect_token(T_RPAREN);
-            }
-            expect_token(T_LBRACE);
-            Vector *body = new_vector();
-            while (!pop_token_if(T_RBRACE)) vector_push_back(body, pop_token());
-
-            Inline *inl = (Inline *)malloc(sizeof(Inline));
-            inl->params = params;
-            inl->body = body;
-            map_insert(inlines, inline_name, inl);
-            continue;
-        }
-
-        // match register allocation
-        if (match_token(K_ALLOC)) {
-            Token *alloc_token = pop_token();
-            char *ident = expect_ident();
-            int reg_index = expect_token(T_REGISTER)->ival;
-
-            if (map_lookup(local_alloc->name2reg, ident) ||
-                (global_alloc && map_lookup(global_alloc->name2reg, ident)))
-                failwith(alloc_token, "Already allocated name " HL_IDENT,
-                         ident);
-            if (local_alloc->reg2name[reg_index] != NULL)
-                failwith(alloc_token,
-                         "You're allocating register " HL_REG " for " HL_IDENT
-                         ", which has already been allocated for " HL_IDENT,
-                         reg_index, ident, local_alloc->reg2name[reg_index]);
-            if (global_alloc && global_alloc->reg2name[reg_index] != NULL)
-                failwith(alloc_token,
-                         "You're allocating register " HL_REG " for " HL_IDENT
-                         ", which has already been allocated for " HL_IDENT,
-                         reg_index, ident, global_alloc->reg2name[reg_index]);
-
-            map_insert(local_alloc->name2reg, ident, (void *)reg_index);
-            local_alloc->reg2name[reg_index] = ident;
-            continue;
-        }
-
-        if (!match_token(T_IDENT)) {
-            vector_push_back(dst, pop_token());
-            continue;
-        }
-
-        Token *ident_token = pop_token();  // expect T_IDENT
-        char *ident = ident_token->sval;
-        KeyValue *kv = NULL;
-
-        // check if the identifier is a name to which a register has been
-        // allocated to locally or globally
-        kv = map_lookup(local_alloc->name2reg, ident);
-        if (kv == NULL && global_alloc != NULL)
-            kv = map_lookup(global_alloc->name2reg, ident);
-        if (kv) {  // if found
-            set_source_token_replaced(ident_token);
-            Token *token = new_token(T_REGISTER);
-            token->ival = (int)kv->value;
-            vector_push_back(dst, token);
-            set_source_token_replaced(NULL);
-            continue;
-        }
-
-        // match argument expansion
-        if (param2arg) {
-            kv = map_lookup(param2arg, ident);
-            if (kv) {  // if found
-                // expand arguments
-                // TODO: (recursive) argument inline expansion?
-                Vector *tokens = (Vector *)(kv->value);
-                for (int i = 0; i < vector_size(tokens); i++)
-                    vector_push_back(dst, (Token *)vector_get(tokens, i));
-
-                continue;
-            }
-        }
-
-        // match inline expansion
-        kv = map_lookup(inlines, ident);
-        if (kv) {  // if found
-            // parse inline's arguments
-            Vector *args = new_vector();
-            expect_token(T_LPAREN);
-            if (!pop_token_if(T_RPAREN)) {
-                do {
-                    Vector *arg = new_vector();
-                    while (!match_token(T_RPAREN) && !match_token(T_COMMA))
-                        vector_push_back(arg, pop_token());
-                    vector_push_back(args, arg);
-                } while (pop_token_if(T_COMMA));
-                expect_token(T_RPAREN);
-            }
-
-            // check if #args is correct
-            Inline *inl = (Inline *)(kv->value);
-            if (vector_size(args) != vector_size(inl->params))
-                failwith(ident_token, "Wrong number of arguments for inline %s",
-                         ident);
-
-            // create a map to correspond params with args
-            Map *param2arg = new_map();
-            for (int i = 0; i < vector_size(args); i++) {
-                Vector *arg = (Vector *)vector_get(args, i);
-                char *param = (char *)vector_get(inl->params, i);
-                map_insert(param2arg, param, arg);
-            }
-
-            free(args);
-
-            // expand inline
-            char *tmp_ns_name = create_temporary_ns_name();
-            vector_push_back(dst, new_labelns_begin(tmp_ns_name));
-            preprocess_phase2(inl->body, dst,
-                              global_alloc ? global_alloc : local_alloc,
-                              param2arg);
-            vector_push_back(dst, new_labelns_end(tmp_ns_name));
-
-            free(param2arg);
-
-            continue;
-        }
-
-        // normal identifier
-        vector_push_back(dst, ident_token);
-    }
+    while (peek_token() != NULL)
+        preprocess_phase2_detail(dst, local_alloc, param2arg);
 
     // restore input_tokens
     input_tokens = org_input_tokens;
@@ -1094,7 +1097,7 @@ void preprocess()
     Vector *src = dst;
     dst = new_vector();
     inlines = new_map();
-    preprocess_phase2(src, dst, NULL, NULL);
+    preprocess_phase2(src, dst, NULL);
     free(inlines);
 
     // set new tokens
