@@ -974,7 +974,7 @@ void preprocess()
 {
     Vector *dst = NULL;
 
-    // Phase 1.1: define and expand macros
+    // Phase 1: define and expand macros
     dst = new_vector();
     Map *macros = new_map();
     while (peek_token() != NULL) {
@@ -1022,7 +1022,7 @@ void preprocess()
     }
     free(macros);
 
-    // Phase 1.2: define and expand inlines
+    // Phase 2: define and expand inlines
     Vector *src = dst;
     dst = new_vector();
     inlines = new_map();
@@ -1033,7 +1033,7 @@ void preprocess()
     input_tokens = dst;
     input_tokens_npos = 0;
 
-    // Phase 2: expand syntax sugars
+    // Phase 3: expand syntax sugars
     dst = new_vector();
     while (peek_token() != NULL) {
         if (match_token(T_REGISTER) || match_token(T_LBRACKET)) {
