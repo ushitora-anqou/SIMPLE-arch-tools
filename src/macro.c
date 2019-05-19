@@ -884,6 +884,117 @@ typedef struct {
     Vector *params, *body;
 } Inline;
 
+static Map *inlines;
+
+// copy tokens from src to dst, expanding inlines if any
+void preprocess_phase2(Vector *src, Vector *dst, Map *param2arg)
+{
+    // save input_tokens
+    Vector *org_input_tokens = input_tokens;
+    int org_input_tokens_nnpos = input_tokens_npos;
+    input_tokens = src;
+    input_tokens_npos = 0;
+
+    // start to copy tokens
+    while (peek_token() != NULL) {
+        // match inline definition
+        if (pop_token_if(K_INLINE)) {
+            char *inline_name = expect_ident();
+            expect_token(T_LPAREN);
+            Vector *params = new_vector();
+            if (!pop_token_if(T_RPAREN)) {
+                vector_push_back(params, expect_ident());
+                while (pop_token_if(T_COMMA))
+                    vector_push_back(params, expect_ident());
+                expect_token(T_RPAREN);
+            }
+            expect_token(T_LBRACE);
+            Vector *body = new_vector();
+            while (!pop_token_if(T_RBRACE)) vector_push_back(body, pop_token());
+
+            Inline *inl = (Inline *)malloc(sizeof(Inline));
+            inl->params = params;
+            inl->body = body;
+            map_insert(inlines, inline_name, inl);
+            continue;
+        }
+
+        if (!match_token(T_IDENT)) {
+            vector_push_back(dst, pop_token());
+            continue;
+        }
+
+        // The next token is T_IDENT i.e. may be a inline or parameter
+        // identifier.
+        Token *ident_token = pop_token();
+        KeyValue *kv = NULL;
+
+        // match argument expansion
+        if (param2arg) {
+            kv = map_lookup(param2arg, ident_token->sval);
+            if (kv) {  // if found
+                // expand arguments
+                // TODO: (recursive) argument inline expansion?
+                Vector *tokens = (Vector *)(kv->value);
+                for (int i = 0; i < vector_size(tokens); i++)
+                    vector_push_back(dst, (Token *)vector_get(tokens, i));
+
+                continue;
+            }
+        }
+
+        // match inline expansion
+        kv = map_lookup(inlines, ident_token->sval);
+        if (kv) {  // if found
+            // parse inline's arguments
+            Vector *args = new_vector();
+            expect_token(T_LPAREN);
+            if (!pop_token_if(T_RPAREN)) {
+                do {
+                    Vector *arg = new_vector();
+                    while (!match_token(T_RPAREN) && !match_token(T_COMMA))
+                        vector_push_back(arg, pop_token());
+                    vector_push_back(args, arg);
+                } while (pop_token_if(T_COMMA));
+                expect_token(T_RPAREN);
+            }
+
+            // check if #args is correct
+            Inline *inl = (Inline *)(kv->value);
+            if (vector_size(args) != vector_size(inl->params))
+                failwith(ident_token, "Wrong number of arguments for inline %s",
+                         ident_token->sval);
+
+            // create a map to correspond params with args
+            Map *param2arg = new_map();
+            for (int i = 0; i < vector_size(args); i++) {
+                Vector *arg = (Vector *)vector_get(args, i);
+                char *param = (char *)vector_get(inl->params, i);
+                map_insert(param2arg, param, arg);
+            }
+
+            free(args);
+
+            // expand inline
+            char *tmp_ns_name = create_temporary_ns_name();
+            vector_push_back(dst, new_labelns_begin(tmp_ns_name));
+            preprocess_phase2(inl->body, dst, param2arg);
+            vector_push_back(dst, new_labelns_end(tmp_ns_name));
+
+            free(param2arg);
+
+            continue;
+        }
+
+        // normal identifier
+        vector_push_back(dst, ident_token);
+    }
+
+    // restore input_tokens
+    input_tokens = org_input_tokens;
+    input_tokens_npos = org_input_tokens_nnpos;
+}
+
 void preprocess()
 {
     Vector *dst = NULL;
@@ -936,98 +1047,12 @@ void preprocess()
     }
     free(macros);
 
-    // set new tokens
-    input_tokens = dst;
-    input_tokens_npos = 0;
-
     // Phase 1.2: define and expand inlines
+    Vector *src = dst;
     dst = new_vector();
-    Map *inlines = new_map();
-    while (peek_token() != NULL) {
-        if (pop_token_if(K_INLINE)) {
-            char *inline_name = expect_ident();
-            expect_token(T_LPAREN);
-            Vector *params = new_vector();
-            if (!pop_token_if(T_RPAREN)) {
-                vector_push_back(params, expect_ident());
-                while (pop_token_if(T_COMMA))
-                    vector_push_back(params, expect_ident());
-                expect_token(T_RPAREN);
-            }
-            expect_token(T_LBRACE);
-            Vector *body = new_vector();
-            while (!pop_token_if(T_RBRACE)) vector_push_back(body, pop_token());
-
-            Inline *inl = (Inline *)malloc(sizeof(Inline));
-            inl->params = params;
-            inl->body = body;
-            map_insert(inlines, inline_name, inl);
-            continue;
-        }
-
-        if (match_token(T_IDENT)) {
-            Token *inline_ident = peek_token();
-            KeyValue *kv = map_lookup(inlines, inline_ident->sval);
-            if (kv != NULL) {
-                pop_token();  // discard inline identifier
-
-                // parse inline's arguments
-                Vector *args = new_vector();
-                expect_token(T_LPAREN);
-                if (!pop_token_if(T_RPAREN)) {
-                    do {
-                        Vector *arg = new_vector();
-                        while (!match_token(T_RPAREN) && !match_token(T_COMMA))
-                            vector_push_back(arg, pop_token());
-                        vector_push_back(args, arg);
-                    } while (pop_token_if(T_COMMA));
-                    expect_token(T_RPAREN);
-                }
-
-                // check if #args is correct
-                Inline *inl = (Inline *)(kv->value);
-                if (vector_size(args) != vector_size(inl->params))
-                    failwith(inline_ident,
-                             "Wrong number of arguments for inline %s",
-                             inline_ident->sval);
-
-                // create a map to correspond params with args
-                Map *param2arg = new_map();
-                for (int i = 0; i < vector_size(args); i++) {
-                    Vector *arg = (Vector *)vector_get(args, i);
-                    char *param = (char *)vector_get(inl->params, i);
-                    map_insert(param2arg, param, arg);
-                }
-
-                // expand inline
-                char *tmp_ns_name = create_temporary_ns_name();
-                vector_push_back(dst, new_labelns_begin(tmp_ns_name));
-                for (int i = 0; i < vector_size(inl->body); i++) {
-                    Token *token = vector_get(inl->body, i);
-                    if (token->kind == T_IDENT) {
-                        KeyValue *kv = map_lookup(param2arg, token->sval);
-                        if (kv != NULL) {
-                            // expand arguments
-                            Vector *tokens = (Vector *)(kv->value);
-                            for (int i = 0; i < vector_size(tokens); i++)
-                                vector_push_back(
-                                    dst, (Token *)vector_get(tokens, i));
-
-                            continue;
-                        }
-                    }
-                    vector_push_back(dst, token);
-                }
-                vector_push_back(dst, new_labelns_end(tmp_ns_name));
-
-                free(param2arg);
-
-                continue;
-            }
-        }
-
-        vector_push_back(dst, pop_token());
-    }
+    inlines = new_map();
+    preprocess_phase2(src, dst, NULL);
+    free(inlines);
 
     // set new tokens
     input_tokens = dst;

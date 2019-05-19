@@ -779,6 +779,42 @@ end(hoge)
 HLT
 " 6
 
+test_macro "
+inline mov(a, b) {
+    a = b
+}
+
+inline add(a, b) {
+    a += b
+}
+
+inline main() {
+    mov(R0, 10)
+    mov(R1, 2)
+    add(R0, R1)
+}
+
+main()
+HLT
+" 12
+
+test_macro "
+inline hoge(a, b) {
+loop:
+    a += b
+	if a <= b then goto loop
+}
+
+inline main() {
+    R0 = 5
+    R1 = 10
+    hoge(R0, R1)
+    R1 = R0
+    hoge(R0, R1)
+}
+
+main()
+HLT" 30
 
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
