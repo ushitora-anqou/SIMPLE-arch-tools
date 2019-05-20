@@ -910,6 +910,19 @@ hoge = 10
 
 halt" 8
 
+test_macro "
+alloc hoge R1
+
+hoge = 42
+
+free hoge
+
+alloc hoge R0
+
+hoge = R1
+
+halt" 42
+
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null
@@ -1039,5 +1052,20 @@ alloc h
 alloc i
 
 halt" ":10:1:.+'i'"
+
+test_macro_error "
+alloc hoge R1
+
+hoge = 42
+
+free hoge
+
+hoge = R1
+
+halt" ":8:"
+
+test_macro_error "
+free hoge
+halt" ":2:1:.+'hoge'"
 
 echo "ok"

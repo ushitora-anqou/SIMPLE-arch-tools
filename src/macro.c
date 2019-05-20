@@ -259,6 +259,7 @@ struct Token_tag {
         K_INLINE,
         K_HALT,
         K_ALLOC,
+        K_FREE,
         P_LABELNS_BEGIN,
         P_LABELNS_END,
     } kind;
@@ -394,6 +395,8 @@ const char *token2str(Token *token)
         return "halt";
     case K_ALLOC:
         return "alloc";
+    case K_FREE:
+        return "free";
     case P_LABELNS_BEGIN:
         return format("P_LABELNS_BEGIN(%s)", token->sval);
     case P_LABELNS_END:
@@ -447,7 +450,8 @@ const char *tokenkind2str(int kind)
     case K_END:
     case K_INLINE:
     case K_HALT:
-    case K_ALLOC: {
+    case K_ALLOC:
+    case K_FREE: {
         Token token = {.kind = kind};
         return token2str(&token);
     }
@@ -564,6 +568,10 @@ Token *next_token()
             }
             if (streql(sval, "alloc")) {
                 token->kind = K_ALLOC;
+                return token;
+            }
+            if (streql(sval, "free")) {
+                token->kind = K_FREE;
                 return token;
             }
 
@@ -949,6 +957,23 @@ void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
 
         map_insert(local_alloc->name2reg, ident, (void *)reg_index);
         local_alloc->reg2name[reg_index] = ident;
+        return;
+    }
+
+    // match register free
+    if (match_token(K_FREE)) {
+        Token *free_token = pop_token();
+        char *ident = expect_ident();
+        expect_token(T_NEWLINE);
+
+        KeyValue *kv = map_lookup(local_alloc->name2reg, ident);
+        if (kv == NULL)
+            failwith(free_token,
+                     "No such register allocation to be freed in this "
+                     "scope: " HL_IDENT,
+                     ident);
+        map_erase(local_alloc->name2reg, ident);
+        local_alloc->reg2name[(int)kv->value] = NULL;
         return;
     }
 
