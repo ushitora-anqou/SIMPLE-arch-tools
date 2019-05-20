@@ -260,6 +260,7 @@ struct Token_tag {
         K_HALT,
         K_ALLOC,
         K_FREE,
+        K_SUPER,
         P_LABELNS_BEGIN,
         P_LABELNS_END,
     } kind;
@@ -397,6 +398,8 @@ const char *token2str(Token *token)
         return "alloc";
     case K_FREE:
         return "free";
+    case K_SUPER:
+        return "super";
     case P_LABELNS_BEGIN:
         return format("P_LABELNS_BEGIN(%s)", token->sval);
     case P_LABELNS_END:
@@ -451,7 +454,8 @@ const char *tokenkind2str(int kind)
     case K_INLINE:
     case K_HALT:
     case K_ALLOC:
-    case K_FREE: {
+    case K_FREE:
+    case K_SUPER: {
         Token token = {.kind = kind};
         return token2str(&token);
     }
@@ -572,6 +576,10 @@ Token *next_token()
             }
             if (streql(sval, "free")) {
                 token->kind = K_FREE;
+                return token;
+            }
+            if (streql(sval, "super")) {
+                token->kind = K_SUPER;
                 return token;
             }
 
@@ -974,6 +982,25 @@ void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
                      ident);
         map_erase(local_alloc->name2reg, ident);
         local_alloc->reg2name[(int)kv->value] = NULL;
+        return;
+    }
+
+    // match super register allocation
+    if (match_token(K_SUPER)) {
+        Token *super_token = pop_token();
+        char *ident = expect_ident();
+        expect_token(T_NEWLINE);
+
+        KeyValue *kv = map_lookup(param2arg, ident);
+        if (kv == NULL)
+            failwith(super_token,
+                     "Invalid super register allocation for " HL_IDENT, ident);
+        Token *reg_token = vector_get((Vector *)(kv->value), 0);
+        if (reg_token == NULL || reg_token->kind != T_REGISTER)
+            failwith(super_token,
+                     "Invalid super register allocation for " HL_IDENT, ident);
+        map_insert(local_alloc->name2reg, ident, (void *)reg_token->ival);
+        local_alloc->reg2name[reg_token->ival] = ident;
         return;
     }
 

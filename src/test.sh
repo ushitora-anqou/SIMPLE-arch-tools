@@ -923,6 +923,73 @@ hoge = R1
 
 halt" 42
 
+test_macro "
+inline piyo(foo, bar, a) {
+    super foo
+    super bar
+    alloc tmp
+
+    tmp = a
+    bar += tmp
+    foo += bar
+}
+
+inline hoge(foo, bar) {
+    super foo
+    super bar
+    alloc a
+    alloc b
+
+    piyo(foo, bar, 3)
+
+    a = 10
+    b = 5
+    a += b
+    bar += a
+    foo += bar
+}
+
+inline main() {
+    alloc foo
+    alloc bar
+
+    foo = 2
+    bar = 3
+    hoge(foo, bar)
+
+    R0 = foo
+}
+
+main()
+halt" 29
+
+test_macro "
+inline fibstep(a, b) {
+    super a
+    super b
+    alloc t
+
+    t = a
+    a = b
+    b += t
+}
+
+alloc res R0
+alloc a
+alloc b
+
+a = 0
+b = 1
+
+fibstep(a, b)
+fibstep(a, b)
+fibstep(a, b)
+fibstep(a, b)
+fibstep(a, b)
+
+res = a
+halt" 5
+
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null
