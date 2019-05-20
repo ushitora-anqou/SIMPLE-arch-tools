@@ -917,21 +917,35 @@ void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
     if (match_token(K_ALLOC)) {
         Token *alloc_token = pop_token();
         char *ident = expect_ident();
-        int reg_index = expect_token(T_REGISTER)->ival;
+        int reg_index = -1;
+        if (match_token(T_REGISTER)) reg_index = expect_token(T_REGISTER)->ival;
+        expect_token(T_NEWLINE);
 
         if (map_lookup(local_alloc->name2reg, ident) ||
             map_lookup(global_alloc->name2reg, ident))
             failwith(alloc_token, "Already allocated name " HL_IDENT, ident);
-        if (local_alloc->reg2name[reg_index] != NULL)
-            failwith(alloc_token,
-                     "You're allocating register " HL_REG " for " HL_IDENT
-                     ", which has already been allocated for " HL_IDENT,
-                     reg_index, ident, local_alloc->reg2name[reg_index]);
-        if (global_alloc->reg2name[reg_index] != NULL)
-            failwith(alloc_token,
-                     "You're allocating register " HL_REG " for " HL_IDENT
-                     ", which has already been allocated for " HL_IDENT,
-                     reg_index, ident, global_alloc->reg2name[reg_index]);
+
+        if (reg_index == -1) {
+            // automatic register allocation
+            for (int i = 0; i < 8; i++) {
+                if (local_alloc->reg2name[i] != NULL) continue;
+                reg_index = i;
+            }
+            if (reg_index == -1)
+                failwith(alloc_token, "No free register for " HL_IDENT, ident);
+        }
+        else {
+            if (local_alloc->reg2name[reg_index] != NULL)
+                failwith(alloc_token,
+                         "You're allocating register " HL_REG " for " HL_IDENT
+                         ", which has already been allocated for " HL_IDENT,
+                         reg_index, ident, local_alloc->reg2name[reg_index]);
+            if (global_alloc->reg2name[reg_index] != NULL)
+                failwith(alloc_token,
+                         "You're allocating register " HL_REG " for " HL_IDENT
+                         ", which has already been allocated for " HL_IDENT,
+                         reg_index, ident, global_alloc->reg2name[reg_index]);
+        }
 
         map_insert(local_alloc->name2reg, ident, (void *)reg_index);
         local_alloc->reg2name[reg_index] = ident;

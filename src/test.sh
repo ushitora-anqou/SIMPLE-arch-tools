@@ -895,6 +895,20 @@ twoinsts(
 )
 halt" 5
 
+test_macro "
+alloc res R0
+alloc hoge
+alloc piyo
+alloc fuga
+
+hoge = 3
+piyo = 5
+fuga = hoge
+fuga += piyo
+res = fuga
+hoge = 10
+
+halt" 8
 
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
@@ -1012,5 +1026,18 @@ loop:
     if a0 < max then goto loop
 exit:
     halt" ":8:1.+R0.+hoge.+a0"
+
+test_macro_error "
+alloc a
+alloc b
+alloc c
+alloc d
+alloc e
+alloc f
+alloc g
+alloc h
+alloc i
+
+halt" ":10:1:.+'i'"
 
 echo "ok"
