@@ -596,6 +596,10 @@ struct AST {
         AST_SUB,
         AST_FIXLSHIFT,
         AST_FIXRSHIFT,
+        AST_LT,
+        AST_LTE,
+        AST_EQ,
+        AST_NEQ,
     } kind;
 
     union {
@@ -624,6 +628,8 @@ AST *new_binop_ast(AST_KIND kind, AST *lhs, AST *rhs)
     ast->rhs = rhs;
     return ast;
 }
+
+AST *parse_expr(void);
 
 AST *parse_unsigned_integer(void)
 {
@@ -661,16 +667,53 @@ AST *parse_shift(void)
     return lhs;
 }
 
-AST *parse()
+AST *parse_relational(void)
 {
-    return parse_shift();
+    AST *lhs = parse_shift();
+    while (match_token(T_LT) || match_token(T_LTEQ)) {
+        Token *token = pop_token();
+        lhs = new_binop_ast(token->kind == T_LT ? AST_LT : AST_LTE, lhs,
+                            parse_shift());
+    }
+    return lhs;
+}
+
+AST *parse_equality(void)
+{
+    AST *lhs = parse_relational();
+    while (match_token(T_EQEQ) || match_token(T_NEQ)) {
+        Token *token = pop_token();
+        lhs = new_binop_ast(token->kind == T_EQEQ ? AST_EQ : AST_NEQ, lhs,
+                            parse_relational());
+    }
+    return lhs;
+}
+
+AST *parse_expr(void)
+{
+    return parse_equality();
+}
+
+AST *parse(void)
+{
+    return parse_expr();
 }
 
 typedef struct GenEnv GenEnv;
 struct GenEnv {
     FILE *fh;
-    int reg_used_flag[8];
+    int label_index, reg_used_flag[8];
 };
+
+GenEnv *new_gen_env(FILE *fh)
+{
+    GenEnv *env = (GenEnv *)malloc(sizeof(GenEnv));
+    env->fh = fh;
+    env->label_index = 0;
+    for (int i = 0; i < 8; i++) env->reg_used_flag[i] = 0;
+
+    return env;
+}
 
 static GenEnv *env;
 
@@ -692,6 +735,11 @@ void give_reg_back(int reg_index)
     assert(env->reg_used_flag[reg_index]);
 
     env->reg_used_flag[reg_index] = 0;
+}
+
+char *make_label(void)
+{
+    return format(".L%d", env->label_index++);
 }
 
 void emit(char *fmt, ...)
@@ -740,6 +788,66 @@ int generate_code_detail(AST *ast)
         emit("SRL R%d, %d", lhs_reg_index, ast->rhs->ival);
         return lhs_reg_index;
     }
+
+    case AST_LT: {
+        int lhs_reg_index = generate_code_detail(ast->lhs),
+            rhs_reg_index = generate_code_detail(ast->rhs);
+        char *lt_label = make_label(), *exit_label = make_label();
+        emit("CMP R%d, R%d", lhs_reg_index, rhs_reg_index);
+        emit("BLT %s", lt_label);
+        emit("LI R%d, 0", lhs_reg_index);
+        emit("B %s", exit_label);
+        emit("%s:", lt_label);
+        emit("LI R%d, 1", lhs_reg_index);
+        emit("%s:", exit_label);
+        give_reg_back(rhs_reg_index);
+        return lhs_reg_index;
+    }
+
+    case AST_LTE: {
+        int lhs_reg_index = generate_code_detail(ast->lhs),
+            rhs_reg_index = generate_code_detail(ast->rhs);
+        char *lte_label = make_label(), *exit_label = make_label();
+        emit("CMP R%d, R%d", lhs_reg_index, rhs_reg_index);
+        emit("BLE %s", lte_label);
+        emit("LI R%d, 0", lhs_reg_index);
+        emit("B %s", exit_label);
+        emit("%s:", lte_label);
+        emit("LI R%d, 1", lhs_reg_index);
+        emit("%s:", exit_label);
+        give_reg_back(rhs_reg_index);
+        return lhs_reg_index;
+    }
+
+    case AST_EQ: {
+        int lhs_reg_index = generate_code_detail(ast->lhs),
+            rhs_reg_index = generate_code_detail(ast->rhs);
+        char *eq_label = make_label(), *exit_label = make_label();
+        emit("CMP R%d, R%d", lhs_reg_index, rhs_reg_index);
+        emit("BE %s", eq_label);
+        emit("LI R%d, 0", lhs_reg_index);
+        emit("B %s", exit_label);
+        emit("%s:", eq_label);
+        emit("LI R%d, 1", lhs_reg_index);
+        emit("%s:", exit_label);
+        give_reg_back(rhs_reg_index);
+        return lhs_reg_index;
+    }
+
+    case AST_NEQ: {
+        int lhs_reg_index = generate_code_detail(ast->lhs),
+            rhs_reg_index = generate_code_detail(ast->rhs);
+        char *neq_label = make_label(), *exit_label = make_label();
+        emit("CMP R%d, R%d", lhs_reg_index, rhs_reg_index);
+        emit("BNE %s", neq_label);
+        emit("LI R%d, 0", lhs_reg_index);
+        emit("B %s", exit_label);
+        emit("%s:", neq_label);
+        emit("LI R%d, 1", lhs_reg_index);
+        emit("%s:", exit_label);
+        give_reg_back(rhs_reg_index);
+        return lhs_reg_index;
+    }
     }
 
     assert(0);
@@ -749,9 +857,7 @@ void generate_code(FILE *fh, AST *ast)
 {
     assert(fh && ast);
 
-    env = (GenEnv *)malloc(sizeof(GenEnv));
-    env->fh = fh;
-    for (int i = 0; i < 8; i++) env->reg_used_flag[i] = 0;
+    env = new_gen_env(fh);
 
     int result_reg_index = generate_code_detail(ast);
 

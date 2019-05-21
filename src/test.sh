@@ -1358,5 +1358,17 @@ test_compiler "1 << 2" 4
 test_compiler "1 + 2 << 2" 12
 test_compiler "5 >> 2" 1
 test_compiler "5 + 1 >> 2" 1
+test_compiler "1 < 2" 1
+test_compiler "2 < 2" 0
+test_compiler "3 < 2" 0
+test_compiler "1 <= 2" 1
+test_compiler "2 <= 2" 1
+test_compiler "3 <= 2" 0
+test_compiler "1 == 2" 0
+test_compiler "2 == 2" 1
+test_compiler "3 == 2" 0
+test_compiler "1 != 2" 1
+test_compiler "2 != 2" 0
+test_compiler "3 != 2" 1
 
 echo "ok"
