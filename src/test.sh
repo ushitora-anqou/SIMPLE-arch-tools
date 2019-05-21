@@ -990,6 +990,41 @@ fibstep(a, b)
 res = a
 halt" 5
 
+test_macro "
+    alloc sum
+    sum = 0
+begin
+    alloc k
+
+    k = 0
+loop:
+    if k == 5 then goto exit
+    sum += k
+    k += 1
+    goto loop
+exit:
+
+    free k
+end
+
+begin
+    alloc k
+
+    k = 0
+loop:
+    if k == 5 then goto exit
+    sum += k
+    k += 1
+    goto loop
+exit:
+
+    free k
+end
+
+    R0 = sum
+    halt
+" 20
+
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null

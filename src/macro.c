@@ -1298,9 +1298,14 @@ void preprocess()
         if (match_token(K_BEGIN)) {
             set_source_token_replaced(pop_token());
 
-            expect_token(T_LPAREN);
-            char *ns_name = expect_ident();
-            expect_token(T_RPAREN);
+            char *ns_name = NULL;
+            if (pop_token_if(T_LPAREN)) {
+                ns_name = expect_ident();
+                expect_token(T_RPAREN);
+            }
+            else {
+                ns_name = create_temporary_ns_name();
+            }
 
             vector_push_back(dst, new_labelns_begin(ns_name));
 
@@ -1311,9 +1316,11 @@ void preprocess()
         if (match_token(K_END)) {
             set_source_token_replaced(pop_token());
 
-            expect_token(T_LPAREN);
-            char *ns_name = expect_ident();
-            expect_token(T_RPAREN);
+            char *ns_name = NULL;
+            if (pop_token_if(T_LPAREN)) {
+                ns_name = expect_ident();
+                expect_token(T_RPAREN);
+            }
 
             vector_push_back(dst, new_labelns_end(ns_name));
 
@@ -1378,7 +1385,10 @@ int main()
         if (match_token(P_LABELNS_END)) {
             Token *token = pop_token();
             char *ns_name = vector_pop_back(labelns_stack);
-            if (ns_name == NULL || !streql(ns_name, token->sval))
+            // if token->sval == NULL i.e. 'end' w/o name then this check is
+            // disabled.
+            if (token->sval != NULL &&
+                (ns_name == NULL || !streql(ns_name, token->sval)))
                 failwith(token, "Invalid end of label namespace: %s",
                          token->sval);
             continue;
