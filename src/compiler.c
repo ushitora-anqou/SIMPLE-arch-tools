@@ -249,6 +249,7 @@ struct Token_tag {
         T_LTLT,
         T_GTGT,
         T_SEMICOLON,
+        T_EXCLAM,
         K_IF,
         K_RETURN,
     } kind;
@@ -302,6 +303,8 @@ const char *token2str(Token *token)
         return ">>";
     case T_SEMICOLON:
         return ";";
+    case T_EXCLAM:
+        return "!";
     case K_IF:
         return "if";
     case K_RETURN:
@@ -336,6 +339,7 @@ const char *tokenkind2str(int kind)
     case T_LTLT:
     case T_GTGT:
     case T_SEMICOLON:
+    case T_EXCLAM:
     case K_RETURN:
     case K_IF: {
         Token token = {.kind = kind};
@@ -527,7 +531,8 @@ Token *next_token()
                 break;
             }
             unget_char();
-            goto unrecognized_character;
+            token->kind = T_EXCLAM;
+            break;
 
         case '=':
             ch = get_char();
@@ -620,6 +625,7 @@ struct AST {
         AST_EXPR_STMT,
         AST_RETURN,
         AST_IF,
+        AST_LNOT,
     } kind;
 
     union {
@@ -692,13 +698,23 @@ AST *parse_primary(void)
     return parse_unsigned_integer();
 }
 
+AST *parse_unary(void)
+{
+    if (pop_token_if(T_EXCLAM)) {
+        AST *ast = new_unop_ast(AST_LNOT, parse_primary());
+        return ast;
+    }
+
+    return parse_primary();
+}
+
 AST *parse_additive(void)
 {
-    AST *lhs = parse_primary();
+    AST *lhs = parse_unary();
     while (match_token(T_PLUS) || match_token(T_MINUS)) {
         Token *token = pop_token();
         lhs = new_binop_ast(token->kind == T_PLUS ? AST_ADD : AST_SUB, lhs,
-                            parse_primary());
+                            parse_unary());
     }
     return lhs;
 }
@@ -845,6 +861,19 @@ int generate_code_detail(AST *ast)
     case AST_INTEGER: {
         int reg_index = get_reg();
         emit("LI R%d, %d", reg_index, ast->ival);
+        return reg_index;
+    }
+
+    case AST_LNOT: {
+        int reg_index = generate_code_detail(ast->ast);
+        char *exit_label = make_label(), *tobetrue_label = make_label();
+        emit("CMP R%d, 0", reg_index);
+        emit("BE %s", tobetrue_label);
+        emit("LI R%d, 0", reg_index);
+        emit("B %s", exit_label);
+        emit("%s:", tobetrue_label);
+        emit("LI R%d, 1", reg_index);
+        emit("%s:", exit_label);
         return reg_index;
     }
 
