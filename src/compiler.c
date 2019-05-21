@@ -876,8 +876,32 @@ AST *analyze_detail(AST *ast)
 
     case AST_EXPR_STMT:
     case AST_RETURN:
-    case AST_LNOT:
         ast->ast = analyze_detail(ast->ast);
+        break;
+
+    case AST_LNOT:
+        assert(ast->ast != NULL);
+        switch (ast->ast->kind) {
+        case AST_LT:
+            ast->ast->kind = AST_GTE;
+            ast = analyze_detail(ast->ast);
+            break;
+        case AST_LTE:
+            ast->ast->kind = AST_GT;
+            ast = analyze_detail(ast->ast);
+            break;
+        case AST_GT:
+            ast->ast->kind = AST_LTE;
+            ast = analyze_detail(ast->ast);
+            break;
+        case AST_GTE:
+            ast->ast->kind = AST_LT;
+            ast = analyze_detail(ast->ast);
+            break;
+        default:
+            ast->ast = analyze_detail(ast->ast);
+            break;
+        }
         break;
 
     case AST_IF:
@@ -1104,6 +1128,7 @@ int generate_code_detail(AST *ast)
         }
         return -1;
     }
+
     default:
         assert(0);
     }
