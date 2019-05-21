@@ -1351,6 +1351,9 @@ test_compiler(){
 }
 
 test_compiler "42" 42
+test_compiler "1+2" 3
+test_compiler "1+2+3+4" 10
+test_compiler "1-2+3+4-5" 1
 
 
 echo "ok"

@@ -571,10 +571,16 @@ struct AST {
 
     enum AST_KIND {
         AST_INTEGER,
+        AST_ADD,
+        AST_SUB,
     } kind;
 
     union {
         int ival;
+
+        struct {
+            AST *lhs, *rhs;
+        };
     };
 };
 
@@ -586,7 +592,17 @@ AST *new_ast(AST_KIND kind, CodeLocation loc)
     return ast;
 }
 
-AST *parse()
+AST *new_binop_ast(AST_KIND kind, AST *lhs, AST *rhs)
+{
+    assert(lhs != NULL && rhs != NULL);
+
+    AST *ast = new_ast(kind, lhs->loc);
+    ast->lhs = lhs;
+    ast->rhs = rhs;
+    return ast;
+}
+
+AST *parse_primary()
 {
     Token *token = expect_token(T_INTEGER);
     AST *ast = new_ast(AST_INTEGER, token->loc);
@@ -594,10 +610,101 @@ AST *parse()
     return ast;
 }
 
+AST *parse_additive()
+{
+    AST *lhs = parse_primary();
+    while (match_token(T_PLUS) || match_token(T_MINUS)) {
+        Token *token = pop_token();
+        lhs = new_binop_ast(token->kind == T_PLUS ? AST_ADD : AST_SUB, lhs,
+                            parse_primary());
+    }
+    return lhs;
+}
+
+AST *parse()
+{
+    return parse_additive();
+}
+
+typedef struct GenEnv GenEnv;
+struct GenEnv {
+    FILE *fh;
+    int reg_used_flag[8];
+};
+
+static GenEnv *env;
+
+int get_reg(void)
+{
+    assert(env);
+
+    for (int i = 0; i < 8; i++) {
+        if (env->reg_used_flag[i]) continue;
+        env->reg_used_flag[i] = 1;
+        return i;
+    }
+
+    assert(0);
+}
+
+void give_reg_back(int reg_index)
+{
+    assert(env->reg_used_flag[reg_index]);
+
+    env->reg_used_flag[reg_index] = 0;
+}
+
+void emit(char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    char *buf = vformat(fmt, ap);
+    fprintf(env->fh, "%s\n", buf);
+    free(buf);
+    va_end(ap);
+}
+
+int generate_code_detail(AST *ast)
+{
+    switch (ast->kind) {
+    case AST_INTEGER: {
+        int reg_index = get_reg();
+        emit("LI R%d, %d", reg_index, ast->ival);
+        return reg_index;
+    }
+
+    case AST_ADD: {
+        int lhs_reg_index = generate_code_detail(ast->lhs),
+            rhs_reg_index = generate_code_detail(ast->rhs);
+        emit("ADD R%d, R%d", lhs_reg_index, rhs_reg_index);
+        give_reg_back(rhs_reg_index);
+        return lhs_reg_index;
+    }
+
+    case AST_SUB: {
+        int lhs_reg_index = generate_code_detail(ast->lhs),
+            rhs_reg_index = generate_code_detail(ast->rhs);
+        emit("SUB R%d, R%d", lhs_reg_index, rhs_reg_index);
+        give_reg_back(rhs_reg_index);
+        return lhs_reg_index;
+    }
+    }
+
+    assert(0);
+}
+
 void generate_code(FILE *fh, AST *ast)
 {
-    fprintf(fh, "LI R0, %d\n", ast->ival);
-    fprintf(fh, "HLT\n");
+    assert(fh && ast);
+
+    env = (GenEnv *)malloc(sizeof(GenEnv));
+    env->fh = fh;
+    for (int i = 0; i < 8; i++) env->reg_used_flag[i] = 0;
+
+    int result_reg_index = generate_code_detail(ast);
+
+    emit("MOV R0, R%d", result_reg_index);
+    emit("HLT");
 }
 
 int main()
