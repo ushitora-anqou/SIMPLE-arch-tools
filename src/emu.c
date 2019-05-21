@@ -1,7 +1,7 @@
 #include "debugger.h"
 
 static Word *p;
-static Word mem[64 * 1024], reg[8];
+static Word mem[0x5000], reg[8];
 static Word cflag;
 enum { FLAG_S, FLAG_Z, FLAG_C, FLAG_V };
 
