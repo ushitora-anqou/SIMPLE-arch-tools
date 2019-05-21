@@ -1350,27 +1350,27 @@ test_compiler(){
     [ $res -eq $2 ] || fail "[ERROR] \"$1\": expect $2 but got $res"
 }
 
-test_compiler "42" 42
-test_compiler "1+2" 3
-test_compiler "1+2+3+4" 10
-test_compiler "1-2+3+4-5" 1
-test_compiler "1 << 2" 4
-test_compiler "1 + 2 << 2" 12
-test_compiler "5 >> 2" 1
-test_compiler "5 + 1 >> 2" 1
-test_compiler "1 < 2" 1
-test_compiler "2 < 2" 0
-test_compiler "3 < 2" 0
-test_compiler "1 <= 2" 1
-test_compiler "2 <= 2" 1
-test_compiler "3 <= 2" 0
-test_compiler "1 == 2" 0
-test_compiler "2 == 2" 1
-test_compiler "3 == 2" 0
-test_compiler "1 != 2" 1
-test_compiler "2 != 2" 0
-test_compiler "3 != 2" 1
-test_compiler "(1 + 2)" 3
-test_compiler "(1 + 2) << 2" 12
+test_compiler "return 42;" 42
+test_compiler "return 1+2;" 3
+test_compiler "return 1+2+3+4;" 10
+test_compiler "return 1-2+3+4-5;" 1
+test_compiler "return 1 << 2;" 4
+test_compiler "return 1 + 2 << 2;" 12
+test_compiler "return 5 >> 2;" 1
+test_compiler "return 5 + 1 >> 2;" 1
+test_compiler "return 1 < 2;" 1
+test_compiler "return 2 < 2;" 0
+test_compiler "return 3 < 2;" 0
+test_compiler "return 1 <= 2;" 1
+test_compiler "return 2 <= 2;" 1
+test_compiler "return 3 <= 2;" 0
+test_compiler "return 1 == 2;" 0
+test_compiler "return 2 == 2;" 1
+test_compiler "return 3 == 2;" 0
+test_compiler "return 1 != 2;" 1
+test_compiler "return 2 != 2;" 0
+test_compiler "return 3 != 2;" 1
+test_compiler "return (1 + 2);" 3
+test_compiler "return (1 + 2) << 2;" 12
 
 echo "ok"

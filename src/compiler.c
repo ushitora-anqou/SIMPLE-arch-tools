@@ -248,7 +248,9 @@ struct Token_tag {
         T_LTEQ,
         T_LTLT,
         T_GTGT,
+        T_SEMICOLON,
         K_IF,
+        K_RETURN,
     } kind;
 
     union {
@@ -298,8 +300,12 @@ const char *token2str(Token *token)
         return "<<";
     case T_GTGT:
         return ">>";
+    case T_SEMICOLON:
+        return ";";
     case K_IF:
         return "if";
+    case K_RETURN:
+        return "return";
     }
     assert(0);
 }
@@ -329,6 +335,8 @@ const char *tokenkind2str(int kind)
     case T_LTEQ:
     case T_LTLT:
     case T_GTGT:
+    case T_SEMICOLON:
+    case K_RETURN:
     case K_IF: {
         Token token = {.kind = kind};
         return token2str(&token);
@@ -389,6 +397,10 @@ Token *next_token()
 
             if (streql(sval, "if")) {
                 token->kind = K_IF;
+                return token;
+            }
+            if (streql(sval, "return")) {
+                token->kind = K_RETURN;
                 return token;
             }
 
@@ -460,6 +472,7 @@ Token *next_token()
         case '}':
             token->kind = T_RBRACE;
             break;
+
         case '(':
             token->kind = T_LPAREN;
             break;
@@ -501,6 +514,10 @@ Token *next_token()
 
         case ':':
             token->kind = T_COLON;
+            break;
+
+        case ';':
+            token->kind = T_SEMICOLON;
             break;
 
         case '!':
@@ -600,10 +617,14 @@ struct AST {
         AST_LTE,
         AST_EQ,
         AST_NEQ,
+        AST_EXPR_STMT,
+        AST_RETURN,
     } kind;
 
     union {
         int ival;
+        Vector *exprs;
+        AST *ast;
 
         struct {
             AST *lhs, *rhs;
@@ -616,6 +637,22 @@ AST *new_ast(AST_KIND kind, CodeLocation loc)
     AST *ast = (AST *)malloc(sizeof(AST));
     ast->kind = kind;
     ast->loc = loc;
+    return ast;
+}
+
+AST *new_ast_wo_loc(AST_KIND kind)
+{
+    AST *ast = (AST *)malloc(sizeof(AST));
+    ast->kind = kind;
+    return ast;
+}
+
+AST *new_unop_ast(AST_KIND kind, AST *lhs)
+{
+    assert(lhs != NULL);
+
+    AST *ast = new_ast(kind, lhs->loc);
+    ast->ast = lhs;
     return ast;
 }
 
@@ -700,9 +737,32 @@ AST *parse_expr(void)
     return parse_equality();
 }
 
+AST *parse_expr_stmt(void)
+{
+    AST *expr = parse_expr();
+    expect_token(T_SEMICOLON);
+    return new_unop_ast(AST_EXPR_STMT, expr);
+}
+
+AST *parse_jump_stmt(void)
+{
+    expect_token(K_RETURN);
+    AST *expr = parse_expr();
+    expect_token(T_SEMICOLON);
+
+    AST *ast = new_unop_ast(AST_RETURN, expr);
+    return ast;
+}
+
+AST *parse_stmt(void)
+{
+    if (match_token(K_RETURN)) return parse_jump_stmt();
+    return parse_expr_stmt();
+}
+
 AST *parse(void)
 {
-    return parse_expr();
+    return parse_stmt();
 }
 
 typedef struct GenEnv GenEnv;
@@ -854,6 +914,20 @@ int generate_code_detail(AST *ast)
         give_reg_back(rhs_reg_index);
         return lhs_reg_index;
     }
+
+    case AST_EXPR_STMT: {
+        give_reg_back(generate_code_detail(ast->ast));
+        return -1;
+    }
+
+    case AST_RETURN: {
+        int reg_index = generate_code_detail(ast->ast);
+        assert(reg_index != -1);
+        emit("MOV R0, R%d", reg_index);
+        emit("HLT");
+        give_reg_back(reg_index);
+        return -1;
+    }
     }
 
     assert(0);
@@ -865,10 +939,8 @@ void generate_code(FILE *fh, AST *ast)
 
     env = new_gen_env(fh);
 
-    int result_reg_index = generate_code_detail(ast);
-
-    emit("MOV R0, R%d", result_reg_index);
-    emit("HLT");
+    int reg_index = generate_code_detail(ast);
+    assert(reg_index == -1);
 }
 
 int main()
