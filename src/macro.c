@@ -932,75 +932,90 @@ void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
     // match register allocation
     if (match_token(K_ALLOC)) {
         Token *alloc_token = pop_token();
-        char *ident = expect_ident();
-        int reg_index = -1;
-        if (match_token(T_REGISTER)) reg_index = expect_token(T_REGISTER)->ival;
-        expect_token(T_NEWLINE);
+        do {
+            char *ident = expect_ident();
+            int reg_index = -1;
+            if (match_token(T_REGISTER))
+                reg_index = expect_token(T_REGISTER)->ival;
 
-        if (map_lookup(local_alloc->name2reg, ident) ||
-            map_lookup(global_alloc->name2reg, ident))
-            failwith(alloc_token, "Already allocated name " HL_IDENT, ident);
+            if (map_lookup(local_alloc->name2reg, ident) ||
+                map_lookup(global_alloc->name2reg, ident))
+                failwith(alloc_token, "Already allocated name " HL_IDENT,
+                         ident);
 
-        if (reg_index == -1) {
-            // automatic register allocation
-            for (int i = 0; i < 8; i++) {
-                if (local_alloc->reg2name[i] != NULL) continue;
-                reg_index = i;
+            if (reg_index == -1) {
+                // automatic register allocation
+                for (int i = 0; i < 8; i++) {
+                    if (local_alloc->reg2name[i] != NULL) continue;
+                    reg_index = i;
+                }
+                if (reg_index == -1)
+                    failwith(alloc_token, "No free register for " HL_IDENT,
+                             ident);
             }
-            if (reg_index == -1)
-                failwith(alloc_token, "No free register for " HL_IDENT, ident);
-        }
-        else {
-            if (local_alloc->reg2name[reg_index] != NULL)
-                failwith(alloc_token,
-                         "You're allocating register " HL_REG " for " HL_IDENT
-                         ", which has already been allocated for " HL_IDENT,
-                         reg_index, ident, local_alloc->reg2name[reg_index]);
-            if (global_alloc->reg2name[reg_index] != NULL)
-                failwith(alloc_token,
-                         "You're allocating register " HL_REG " for " HL_IDENT
-                         ", which has already been allocated for " HL_IDENT,
-                         reg_index, ident, global_alloc->reg2name[reg_index]);
-        }
+            else {
+                if (local_alloc->reg2name[reg_index] != NULL)
+                    failwith(
+                        alloc_token,
+                        "You're allocating register " HL_REG " for " HL_IDENT
+                        ", which has already been allocated for " HL_IDENT,
+                        reg_index, ident, local_alloc->reg2name[reg_index]);
+                if (global_alloc->reg2name[reg_index] != NULL)
+                    failwith(
+                        alloc_token,
+                        "You're allocating register " HL_REG " for " HL_IDENT
+                        ", which has already been allocated for " HL_IDENT,
+                        reg_index, ident, global_alloc->reg2name[reg_index]);
+            }
 
-        map_insert(local_alloc->name2reg, ident, (void *)reg_index);
-        local_alloc->reg2name[reg_index] = ident;
+            map_insert(local_alloc->name2reg, ident, (void *)reg_index);
+            local_alloc->reg2name[reg_index] = ident;
+        } while (!pop_token_if(T_NEWLINE) && expect_token(T_COMMA));
+
         return;
     }
 
     // match register free
     if (match_token(K_FREE)) {
         Token *free_token = pop_token();
-        char *ident = expect_ident();
-        expect_token(T_NEWLINE);
 
-        KeyValue *kv = map_lookup(local_alloc->name2reg, ident);
-        if (kv == NULL)
-            failwith(free_token,
-                     "No such register allocation to be freed in this "
-                     "scope: " HL_IDENT,
-                     ident);
-        map_erase(local_alloc->name2reg, ident);
-        local_alloc->reg2name[(int)kv->value] = NULL;
+        do {
+            char *ident = expect_ident();
+
+            KeyValue *kv = map_lookup(local_alloc->name2reg, ident);
+            if (kv == NULL)
+                failwith(free_token,
+                         "No such register allocation to be freed in this "
+                         "scope: " HL_IDENT,
+                         ident);
+            map_erase(local_alloc->name2reg, ident);
+            local_alloc->reg2name[(int)kv->value] = NULL;
+        } while (!pop_token_if(T_NEWLINE) && expect_token(T_COMMA));
+
         return;
     }
 
     // match super register allocation
     if (match_token(K_SUPER)) {
         Token *super_token = pop_token();
-        char *ident = expect_ident();
-        expect_token(T_NEWLINE);
 
-        KeyValue *kv = map_lookup(param2arg, ident);
-        if (kv == NULL)
-            failwith(super_token,
-                     "Invalid super register allocation for " HL_IDENT, ident);
-        Token *reg_token = vector_get((Vector *)(kv->value), 0);
-        if (reg_token == NULL || reg_token->kind != T_REGISTER)
-            failwith(super_token,
-                     "Invalid super register allocation for " HL_IDENT, ident);
-        map_insert(local_alloc->name2reg, ident, (void *)reg_token->ival);
-        local_alloc->reg2name[reg_token->ival] = ident;
+        do {
+            char *ident = expect_ident();
+
+            KeyValue *kv = map_lookup(param2arg, ident);
+            if (kv == NULL)
+                failwith(super_token,
+                         "Invalid super register allocation for " HL_IDENT,
+                         ident);
+            Token *reg_token = vector_get((Vector *)(kv->value), 0);
+            if (reg_token == NULL || reg_token->kind != T_REGISTER)
+                failwith(super_token,
+                         "Invalid super register allocation for " HL_IDENT,
+                         ident);
+            map_insert(local_alloc->name2reg, ident, (void *)reg_token->ival);
+            local_alloc->reg2name[reg_token->ival] = ident;
+        } while (!pop_token_if(T_NEWLINE) && expect_token(T_COMMA));
+
         return;
     }
 

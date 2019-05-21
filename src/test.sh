@@ -1025,6 +1025,76 @@ end
     halt
 " 20
 
+test_macro "
+alloc hoge
+
+alloc piyo, fuga, foo
+    piyo = 10
+    fuga = 5
+    foo = 3
+    fuga += foo
+    piyo += fuga
+    hoge = piyo
+free piyo, fuga, foo
+
+alloc piyo, fuga, foo
+    piyo = 10
+    fuga = 5
+    foo = 4
+    fuga += foo
+    piyo += fuga
+    hoge = piyo
+free piyo, fuga, foo
+
+R0 = hoge
+
+halt" 19
+
+test_macro "
+inline piyo(foo, bar, a) {
+    super foo, bar
+    alloc tmp
+
+    tmp = a
+    bar += tmp
+    foo += bar
+}
+
+inline hoge(foo, bar) {
+    super foo, bar
+    alloc a, b
+
+    piyo(foo, bar, 3)
+
+    a = 10
+    b = 5
+    a += b
+    bar += a
+    foo += bar
+}
+
+inline main() {
+    alloc foo, bar
+
+    foo = 2
+    bar = 3
+    hoge(foo, bar)
+
+    R0 = foo
+}
+
+main()
+halt" 29
+
+test_macro "
+alloc a, b, c, d, e, f, g, h
+free a, b, c, d, e, f, g, h
+alloc a, b, c, d, e, f, g, h
+free a, b, c, d, e, f, g, h
+R0 = 10
+halt
+" 10
+
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null
