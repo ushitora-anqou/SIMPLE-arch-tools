@@ -245,7 +245,9 @@ struct Token_tag {
         T_EQEQ,
         T_NEQ,
         T_LT,
+        T_GT,
         T_LTEQ,
+        T_GTEQ,
         T_LTLT,
         T_GTGT,
         T_SEMICOLON,
@@ -288,7 +290,11 @@ const char *token2str(Token *token)
     case T_LT:
         return "<";
     case T_LTEQ:
-        return "<";
+        return "<=";
+    case T_GT:
+        return ">";
+    case T_GTEQ:
+        return ">=";
     case T_MINUS:
         return "-";
     case T_COLON:
@@ -336,6 +342,8 @@ const char *tokenkind2str(int kind)
     case T_NEQ:
     case T_LT:
     case T_LTEQ:
+    case T_GT:
+    case T_GTEQ:
     case T_LTLT:
     case T_GTGT:
     case T_SEMICOLON:
@@ -513,7 +521,12 @@ Token *next_token()
                 token->kind = T_GTGT;
                 break;
             }
-            goto unrecognized_character;
+            if (ch == '=') {
+                token->kind = T_GTEQ;
+                break;
+            }
+            unget_char();
+            token->kind = T_GT;
         } break;
 
         case ':':
@@ -620,6 +633,8 @@ struct AST {
         AST_FIXRSHIFT,
         AST_LT,
         AST_LTE,
+        AST_GT,
+        AST_GTE,
         AST_EQ,
         AST_NEQ,
         AST_EXPR_STMT,
@@ -735,10 +750,25 @@ AST *parse_shift(void)
 AST *parse_relational(void)
 {
     AST *lhs = parse_shift();
-    while (match_token(T_LT) || match_token(T_LTEQ)) {
+    while (match_token(T_LT) || match_token(T_GT) || match_token(T_LTEQ) ||
+           match_token(T_GTEQ)) {
         Token *token = pop_token();
-        lhs = new_binop_ast(token->kind == T_LT ? AST_LT : AST_LTE, lhs,
-                            parse_shift());
+        switch (token->kind) {
+        case T_LT:
+            lhs = new_binop_ast(AST_LT, lhs, parse_shift());
+            break;
+        case T_GT:
+            lhs = new_binop_ast(AST_GT, lhs, parse_shift());
+            break;
+        case T_LTEQ:
+            lhs = new_binop_ast(AST_LTE, lhs, parse_shift());
+            break;
+        case T_GTEQ:
+            lhs = new_binop_ast(AST_GTE, lhs, parse_shift());
+            break;
+        default:
+            assert(0);
+        }
     }
     return lhs;
 }
@@ -832,6 +862,16 @@ AST *analyze_detail(AST *ast)
     case AST_NEQ:
         ast->lhs = analyze_detail(ast->lhs);
         ast->rhs = analyze_detail(ast->rhs);
+        break;
+
+    case AST_GT:
+        ast = new_binop_ast(AST_LT, analyze_detail(ast->rhs),
+                            analyze_detail(ast->lhs));
+        break;
+
+    case AST_GTE:
+        ast = new_binop_ast(AST_LTE, analyze_detail(ast->rhs),
+                            analyze_detail(ast->lhs));
         break;
 
     case AST_EXPR_STMT:
@@ -1064,9 +1104,9 @@ int generate_code_detail(AST *ast)
         }
         return -1;
     }
+    default:
+        assert(0);
     }
-
-    assert(0);
 }
 
 void generate_code(FILE *fh, Vector *ast)
