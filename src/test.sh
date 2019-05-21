@@ -1370,5 +1370,7 @@ test_compiler "3 == 2" 0
 test_compiler "1 != 2" 1
 test_compiler "2 != 2" 0
 test_compiler "3 != 2" 1
+test_compiler "(1 + 2)" 3
+test_compiler "(1 + 2) << 2" 12
 
 echo "ok"

@@ -641,6 +641,12 @@ AST *parse_unsigned_integer(void)
 
 AST *parse_primary(void)
 {
+    if (pop_token_if(T_LPAREN)) {
+        AST *ast = parse_expr();
+        expect_token(T_RPAREN);
+        return ast;
+    }
+
     return parse_unsigned_integer();
 }
 
