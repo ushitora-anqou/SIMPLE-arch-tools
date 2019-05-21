@@ -816,6 +816,57 @@ Vector *parse(void)
     return stmts;
 }
 
+AST *analyze_detail(AST *ast)
+{
+    switch (ast->kind) {
+    case AST_INTEGER:
+        break;
+
+    case AST_ADD:
+    case AST_SUB:
+    case AST_FIXLSHIFT:
+    case AST_FIXRSHIFT:
+    case AST_LT:
+    case AST_LTE:
+    case AST_EQ:
+    case AST_NEQ:
+        ast->lhs = analyze_detail(ast->lhs);
+        ast->rhs = analyze_detail(ast->rhs);
+        break;
+
+    case AST_EXPR_STMT:
+    case AST_RETURN:
+    case AST_LNOT:
+        ast->ast = analyze_detail(ast->ast);
+        break;
+
+    case AST_IF:
+        ast->if_cond = analyze_detail(ast->if_cond);
+        break;
+
+    case AST_COMPOUND:
+        for (int i = 0; i < vector_size(ast->stmts); i++)
+            vector_set(ast->stmts, i,
+                       analyze_detail((AST *)vector_get(ast->stmts, i)));
+        break;
+    }
+
+    return ast;
+}
+
+Vector *analyze(Vector *src)
+{
+    Vector *dst = new_vector();
+
+    for (int i = 0; i < vector_size(src); i++) {
+        AST *ast = (AST *)vector_get(src, i);
+        assert(ast != NULL);
+        vector_push_back(dst, analyze_detail(ast));
+    }
+
+    return dst;
+}
+
 typedef struct GenEnv GenEnv;
 struct GenEnv {
     FILE *fh;
@@ -1035,6 +1086,7 @@ int main()
 {
     read_all_tokens(stdin);
     Vector *ast = parse();
+    ast = analyze(ast);
     generate_code(stdout, ast);
 
     free(ast);
