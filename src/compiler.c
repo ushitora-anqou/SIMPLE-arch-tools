@@ -619,6 +619,7 @@ struct AST {
         AST_NEQ,
         AST_EXPR_STMT,
         AST_RETURN,
+        AST_IF,
     } kind;
 
     union {
@@ -628,6 +629,9 @@ struct AST {
 
         struct {
             AST *lhs, *rhs;
+        };
+        struct {
+            AST *if_cond, *if_body;
         };
     };
 };
@@ -667,6 +671,7 @@ AST *new_binop_ast(AST_KIND kind, AST *lhs, AST *rhs)
 }
 
 AST *parse_expr(void);
+AST *parse_stmt(void);
 
 AST *parse_unsigned_integer(void)
 {
@@ -754,15 +759,31 @@ AST *parse_jump_stmt(void)
     return ast;
 }
 
+AST *parse_selection_stmt(void)
+{
+    expect_token(K_IF);
+    expect_token(T_LPAREN);
+    AST *cond_expr = parse_expr();
+    expect_token(T_RPAREN);
+    AST *body = parse_stmt();
+    AST *ast = new_ast_wo_loc(AST_IF);
+    ast->if_cond = cond_expr;
+    ast->if_body = body;
+    return ast;
+}
+
 AST *parse_stmt(void)
 {
     if (match_token(K_RETURN)) return parse_jump_stmt();
+    if (match_token(K_IF)) return parse_selection_stmt();
     return parse_expr_stmt();
 }
 
-AST *parse(void)
+Vector *parse(void)
 {
-    return parse_stmt();
+    Vector *stmts = new_vector();
+    while (peek_token()) vector_push_back(stmts, parse_stmt());
+    return stmts;
 }
 
 typedef struct GenEnv GenEnv;
@@ -928,25 +949,40 @@ int generate_code_detail(AST *ast)
         give_reg_back(reg_index);
         return -1;
     }
+
+    case AST_IF: {
+        int reg_index = generate_code_detail(ast->if_cond);
+        give_reg_back(reg_index);
+        char *exit_label = make_label();
+        assert(reg_index != -1);
+        emit("CMP R%d, 0", reg_index);
+        emit("BE %s", exit_label);
+        assert(generate_code_detail(ast->if_body) == -1);
+        emit("%s:", exit_label);
+        return -1;
+    }
     }
 
     assert(0);
 }
 
-void generate_code(FILE *fh, AST *ast)
+void generate_code(FILE *fh, Vector *ast)
 {
     assert(fh && ast);
 
     env = new_gen_env(fh);
 
-    int reg_index = generate_code_detail(ast);
-    assert(reg_index == -1);
+    for (int i = 0; i < vector_size(ast); i++) {
+        AST *stmt = (AST *)vector_get(ast, i);
+        int reg_index = generate_code_detail(stmt);
+        assert(reg_index == -1);
+    }
 }
 
 int main()
 {
     read_all_tokens(stdin);
-    AST *ast = parse();
+    Vector *ast = parse();
     generate_code(stdout, ast);
 
     free(ast);

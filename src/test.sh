@@ -1372,5 +1372,8 @@ test_compiler "return 2 != 2;" 0
 test_compiler "return 3 != 2;" 1
 test_compiler "return (1 + 2);" 3
 test_compiler "return (1 + 2) << 2;" 12
+test_compiler "if (1 < 2) return 1; return 0;" 1
+test_compiler "if (2 < 2) return 1; return 0;" 0
+test_compiler "if (2 + 3 - 1 <= 2 + 2 - 5) return 1; return 0;" 0
 
 echo "ok"
