@@ -246,6 +246,8 @@ struct Token_tag {
         T_NEQ,
         T_LT,
         T_LTEQ,
+        T_LTLT,
+        T_GTGT,
         K_IF,
     } kind;
 
@@ -292,6 +294,10 @@ const char *token2str(Token *token)
         return "=";
     case T_EQEQ:
         return "==";
+    case T_LTLT:
+        return "<<";
+    case T_GTGT:
+        return ">>";
     case K_IF:
         return "if";
     }
@@ -321,6 +327,8 @@ const char *tokenkind2str(int kind)
     case T_NEQ:
     case T_LT:
     case T_LTEQ:
+    case T_LTLT:
+    case T_GTGT:
     case K_IF: {
         Token token = {.kind = kind};
         return token2str(&token);
@@ -470,12 +478,25 @@ Token *next_token()
 
         case '<': {
             ch = get_char();
+            if (ch == '<') {
+                token->kind = T_LTLT;
+                break;
+            }
             if (ch == '=') {
                 token->kind = T_LTEQ;
                 break;
             }
             unget_char();
             token->kind = T_LT;
+        } break;
+
+        case '>': {
+            ch = get_char();
+            if (ch == '>') {
+                token->kind = T_GTGT;
+                break;
+            }
+            goto unrecognized_character;
         } break;
 
         case ':':
@@ -573,6 +594,8 @@ struct AST {
         AST_INTEGER,
         AST_ADD,
         AST_SUB,
+        AST_FIXLSHIFT,
+        AST_FIXRSHIFT,
     } kind;
 
     union {
@@ -602,7 +625,7 @@ AST *new_binop_ast(AST_KIND kind, AST *lhs, AST *rhs)
     return ast;
 }
 
-AST *parse_primary()
+AST *parse_unsigned_integer(void)
 {
     Token *token = expect_token(T_INTEGER);
     AST *ast = new_ast(AST_INTEGER, token->loc);
@@ -610,7 +633,12 @@ AST *parse_primary()
     return ast;
 }
 
-AST *parse_additive()
+AST *parse_primary(void)
+{
+    return parse_unsigned_integer();
+}
+
+AST *parse_additive(void)
 {
     AST *lhs = parse_primary();
     while (match_token(T_PLUS) || match_token(T_MINUS)) {
@@ -621,9 +649,21 @@ AST *parse_additive()
     return lhs;
 }
 
+AST *parse_shift(void)
+{
+    AST *lhs = parse_additive();
+    while (match_token(T_LTLT) || match_token(T_GTGT)) {
+        Token *token = pop_token();
+        lhs =
+            new_binop_ast(token->kind == T_LTLT ? AST_FIXLSHIFT : AST_FIXRSHIFT,
+                          lhs, parse_unsigned_integer());
+    }
+    return lhs;
+}
+
 AST *parse()
 {
-    return parse_additive();
+    return parse_shift();
 }
 
 typedef struct GenEnv GenEnv;
@@ -686,6 +726,18 @@ int generate_code_detail(AST *ast)
             rhs_reg_index = generate_code_detail(ast->rhs);
         emit("SUB R%d, R%d", lhs_reg_index, rhs_reg_index);
         give_reg_back(rhs_reg_index);
+        return lhs_reg_index;
+    }
+
+    case AST_FIXLSHIFT: {
+        int lhs_reg_index = generate_code_detail(ast->lhs);
+        emit("SLL R%d, %d", lhs_reg_index, ast->rhs->ival);
+        return lhs_reg_index;
+    }
+
+    case AST_FIXRSHIFT: {
+        int lhs_reg_index = generate_code_detail(ast->lhs);
+        emit("SRL R%d, %d", lhs_reg_index, ast->rhs->ival);
         return lhs_reg_index;
     }
     }
