@@ -63,3 +63,4 @@ src/debugger
 *.membin
 *.pdf
 .byebug_history
+src/compiler

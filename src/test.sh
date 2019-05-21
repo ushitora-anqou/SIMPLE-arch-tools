@@ -1344,5 +1344,13 @@ alloc a, b, c, d, e, f, g, h
 R0 = 10
 halt" "12:13:.+No such register allocation.+'h'"
 
+test_compiler(){
+    echo "$1" | ./compiler | ./macro | ./assembler | ./emulator -q
+    res=$?
+    [ $res -eq $2 ] || fail "[ERROR] \"$1\": expect $2 but got $res"
+}
+
+test_compiler "42" 42
+
 
 echo "ok"

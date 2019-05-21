@@ -1,6 +1,6 @@
 CFLAGS=-std=c11 -g3 -O0 -Wall
 
-all: debugger emulator assembler encoder macro
+all: debugger emulator assembler encoder macro compiler
 
 debugger: debugger.h debugger.c asm.c emu.c utility.c utility.h
 	gcc $(CFLAGS) -o $@ debugger.c asm.c emu.c utility.c
@@ -17,7 +17,10 @@ encoder: encoder.c
 macro: utility.h macro.c utility.c
 	gcc $(CFLAGS) -o $@ macro.c utility.c
 
-test: test.sh emulator assembler encoder macro
+compiler: utility.h compiler.c utility.c
+	gcc $(CFLAGS) -o $@ compiler.c utility.c
+
+test: test.sh emulator assembler encoder macro compiler
 	./test.sh
 
 clean:
