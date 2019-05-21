@@ -626,11 +626,12 @@ struct AST {
         AST_RETURN,
         AST_IF,
         AST_LNOT,
+        AST_COMPOUND,
     } kind;
 
     union {
         int ival;
-        Vector *exprs;
+        Vector *exprs, *stmts;
         AST *ast;
 
         struct {
@@ -788,10 +789,23 @@ AST *parse_selection_stmt(void)
     return ast;
 }
 
+AST *parse_compound_stmt(void)
+{
+    Vector *stmts = new_vector();
+
+    expect_token(T_LBRACE);
+    while (!pop_token_if(T_RBRACE)) vector_push_back(stmts, parse_stmt());
+
+    AST *ast = new_ast_wo_loc(AST_COMPOUND);
+    ast->stmts = stmts;
+    return ast;
+}
+
 AST *parse_stmt(void)
 {
     if (match_token(K_RETURN)) return parse_jump_stmt();
     if (match_token(K_IF)) return parse_selection_stmt();
+    if (match_token(T_LBRACE)) return parse_compound_stmt();
     return parse_expr_stmt();
 }
 
@@ -988,6 +1002,15 @@ int generate_code_detail(AST *ast)
         emit("BE %s", exit_label);
         assert(generate_code_detail(ast->if_body) == -1);
         emit("%s:", exit_label);
+        return -1;
+    }
+
+    case AST_COMPOUND: {
+        for (int i = 0; i < vector_size(ast->stmts); i++) {
+            AST *stmt = (AST *)vector_get(ast->stmts, i);
+            int reg_index = generate_code_detail(stmt);
+            assert(reg_index == -1);
+        }
         return -1;
     }
     }
