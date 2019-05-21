@@ -888,25 +888,85 @@ typedef struct {
 
 static Map *inlines;
 
-typedef struct {
+typedef struct AllocTable AllocTable;
+struct AllocTable {
+    AllocTable *parent;
     Map *name2reg;
     char *reg2name[8];
-} AllocTable;
+};
 
-AllocTable *new_alloc_table()
+AllocTable *new_alloc_table(AllocTable *parent)
 {
     AllocTable *tbl = (AllocTable *)malloc(sizeof(AllocTable));
+    tbl->parent = parent;
     tbl->name2reg = new_map();
     for (int i = 0; i < 8; i++) tbl->reg2name[i] = NULL;
     return tbl;
 }
 
+int at_lookup_reg_by_name(AllocTable *at, char *name, int depth)
+{
+    if (at == NULL) return -1;
+    KeyValue *kv = map_lookup(at->name2reg, name);
+    if (kv != NULL) return (int)kv->value;
+    if (depth == 0 || at->parent == NULL) return -1;
+    return at_lookup_reg_by_name(at->parent, name, depth - 1);
+}
+
+char *at_lookup_name_by_reg(AllocTable *at, int reg_index, int depth)
+{
+    if (at == NULL) return NULL;
+    char *name = at->reg2name[reg_index];
+    if (depth == 0 || name || at->parent == NULL) return name;
+    return at_lookup_name_by_reg(at->parent, reg_index, depth - 1);
+}
+
+int at_lookup_reg(AllocTable *at, char *name)
+{
+    return at_lookup_reg_by_name(at, name, 0);
+}
+
+char *at_lookup_name(AllocTable *at, int reg_index)
+{
+    return at_lookup_name_by_reg(at, reg_index, 0);
+}
+
+int at_recur_lookup_reg(AllocTable *at, char *name)
+{
+    return at_lookup_reg_by_name(at, name, -1);
+}
+
+char *at_recur_lookup_name(AllocTable *at, int reg_index)
+{
+    return at_lookup_name_by_reg(at, reg_index, -1);
+}
+
+void at_alloc_reg(AllocTable *at, char *name, int reg_index)
+{
+    assert(map_lookup(at->name2reg, name) == NULL);
+    assert(at->reg2name[reg_index] == NULL);
+
+    map_insert(at->name2reg, name, (void *)reg_index);
+    at->reg2name[reg_index] = name;
+}
+
+void at_free_reg(AllocTable *at, char *name, int reg_index)
+{
+    assert(map_lookup(at->name2reg, name) != NULL);
+    assert(at->reg2name[reg_index] != NULL);
+
+    map_erase(at->name2reg, name);
+    at->reg2name[(int)reg_index] = NULL;
+}
+
 static AllocTable *global_alloc;
 
 void preprocess_phase2(Vector *src, Vector *dst, Map *param2arg);
-void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
+void preprocess_phase2_detail(Vector *dst, AllocTable **local_alloc_ptr,
                               Map *param2arg)
 {
+    AllocTable *local_alloc = *local_alloc_ptr;
+
     // match inline definition
     if (pop_token_if(K_INLINE)) {
         char *inline_name = expect_ident();
@@ -938,15 +998,15 @@ void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
             if (match_token(T_REGISTER))
                 reg_index = expect_token(T_REGISTER)->ival;
 
-            if (map_lookup(local_alloc->name2reg, ident) ||
-                map_lookup(global_alloc->name2reg, ident))
+            if (at_recur_lookup_reg(local_alloc, ident) != -1 ||
+                at_recur_lookup_reg(global_alloc, ident) != -1)
                 failwith(alloc_token, "Already allocated name " HL_IDENT,
                          ident);
 
             if (reg_index == -1) {
                 // automatic register allocation
                 for (int i = 0; i < 8; i++) {
-                    if (local_alloc->reg2name[i] != NULL) continue;
+                    if (at_recur_lookup_name(local_alloc, i) != NULL) continue;
                     reg_index = i;
                 }
                 if (reg_index == -1)
@@ -954,13 +1014,16 @@ void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
                              ident);
             }
             else {
-                if (local_alloc->reg2name[reg_index] != NULL)
-                    failwith(
-                        alloc_token,
-                        "You're allocating register " HL_REG " for " HL_IDENT
-                        ", which has already been allocated for " HL_IDENT,
-                        reg_index, ident, local_alloc->reg2name[reg_index]);
-                if (global_alloc->reg2name[reg_index] != NULL)
+                char *name;
+                name = at_recur_lookup_name(local_alloc, reg_index);
+                if (name != NULL)
+                    failwith(alloc_token,
+                             "You're allocating register " HL_REG
+                             " for " HL_IDENT
+                             ", which has already been allocated for " HL_IDENT,
+                             reg_index, ident, name);
+                name = at_recur_lookup_name(global_alloc, reg_index);
+                if (name != NULL)
                     failwith(
                         alloc_token,
                         "You're allocating register " HL_REG " for " HL_IDENT
@@ -968,8 +1031,7 @@ void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
                         reg_index, ident, global_alloc->reg2name[reg_index]);
             }
 
-            map_insert(local_alloc->name2reg, ident, (void *)reg_index);
-            local_alloc->reg2name[reg_index] = ident;
+            at_alloc_reg(local_alloc, ident, reg_index);
         } while (!pop_token_if(T_NEWLINE) && expect_token(T_COMMA));
 
         return;
@@ -981,15 +1043,13 @@ void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
 
         do {
             char *ident = expect_ident();
-
-            KeyValue *kv = map_lookup(local_alloc->name2reg, ident);
-            if (kv == NULL)
+            int reg_index = at_lookup_reg(local_alloc, ident);
+            if (reg_index == -1)
                 failwith(free_token,
                          "No such register allocation to be freed in this "
                          "scope: " HL_IDENT,
                          ident);
-            map_erase(local_alloc->name2reg, ident);
-            local_alloc->reg2name[(int)kv->value] = NULL;
+            at_free_reg(local_alloc, ident, reg_index);
         } while (!pop_token_if(T_NEWLINE) && expect_token(T_COMMA));
 
         return;
@@ -1012,10 +1072,58 @@ void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
                 failwith(super_token,
                          "Invalid super register allocation for " HL_IDENT,
                          ident);
-            map_insert(local_alloc->name2reg, ident, (void *)reg_token->ival);
-            local_alloc->reg2name[reg_token->ival] = ident;
+
+            at_alloc_reg(local_alloc, ident, reg_token->ival);
         } while (!pop_token_if(T_NEWLINE) && expect_token(T_COMMA));
 
+        return;
+    }
+
+    if (match_token(K_BEGIN)) {
+        set_source_token_replaced(pop_token());
+
+        char *ns_name = NULL;
+        if (pop_token_if(T_LPAREN)) {
+            ns_name = expect_ident();
+            expect_token(T_RPAREN);
+        }
+        else {
+            ns_name = create_temporary_ns_name();
+        }
+
+        vector_push_back(dst, new_labelns_begin(ns_name));
+
+        // update local_alloc
+        // TODO: LABEL namespace is no longer correct.
+        *local_alloc_ptr = new_alloc_table(local_alloc);
+
+        set_source_token_replaced(NULL);
+        return;
+    }
+
+    if (match_token(K_END)) {
+        Token *end_token = pop_token();
+        set_source_token_replaced(end_token);
+
+        char *ns_name = NULL;
+        if (pop_token_if(T_LPAREN)) {
+            ns_name = expect_ident();
+            expect_token(T_RPAREN);
+        }
+
+        vector_push_back(dst, new_labelns_end(ns_name));
+
+        // update local_alloc
+        // TODO: LABEL namespace is no longer correct.
+        if (local_alloc->parent == NULL) {
+            if (ns_name)
+                failwith(end_token, "Too much 'end' token: " HL_IDENT, ns_name);
+            else
+                failwith(end_token, "Too much 'end' token");
+        }
+        *local_alloc_ptr = local_alloc->parent;
+
+        set_source_token_replaced(NULL);
         return;
     }
 
@@ -1026,21 +1134,21 @@ void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
 
     Token *ident_token = pop_token();  // expect T_IDENT
     char *ident = ident_token->sval;
-    KeyValue *kv = NULL;
 
     // check if the identifier is a name to which a register has been
     // allocated to locally or globally
-    kv = map_lookup(local_alloc->name2reg, ident);
-    if (kv == NULL) kv = map_lookup(global_alloc->name2reg, ident);
-    if (kv) {  // if found
+    int reg_index = at_recur_lookup_reg(local_alloc, ident);
+    if (reg_index == -1) reg_index = at_lookup_reg(global_alloc, ident);
+    if (reg_index != -1) {  // if found
         set_source_token_replaced(ident_token);
         Token *token = new_token(T_REGISTER);
-        token->ival = (int)kv->value;
+        token->ival = reg_index;
         vector_push_back(dst, token);
         set_source_token_replaced(NULL);
         return;
     }
 
+    KeyValue *kv = NULL;
     // match argument expansion
     if (param2arg) {
         kv = map_lookup(param2arg, ident);
@@ -1064,7 +1172,7 @@ void preprocess_phase2_detail(Vector *dst, AllocTable *local_alloc,
             do {
                 Vector *arg = new_vector();
                 while (!match_token(T_RPAREN) && !match_token(T_COMMA))
-                    preprocess_phase2_detail(arg, local_alloc, param2arg);
+                    preprocess_phase2_detail(arg, local_alloc_ptr, param2arg);
                 vector_push_back(args, arg);
             } while (pop_token_if(T_COMMA));
             expect_token(T_RPAREN);
@@ -1110,12 +1218,16 @@ void preprocess_phase2(Vector *src, Vector *dst, Map *param2arg)
     input_tokens = src;
     input_tokens_npos = 0;
 
-    AllocTable *local_alloc = new_alloc_table();
+    // NOTE: global_alloc is completely separated from local_alloc.
+    AllocTable *local_alloc = new_alloc_table(NULL);
     if (global_alloc == NULL) global_alloc = local_alloc;
 
     // start to copy tokens
     while (peek_token() != NULL)
-        preprocess_phase2_detail(dst, local_alloc, param2arg);
+        preprocess_phase2_detail(dst, &local_alloc, param2arg);
+
+    assert(local_alloc != NULL);
+    if (local_alloc->parent != NULL) failwith(NULL, "Unexpected EOF");
 
     // restore input_tokens
     input_tokens = org_input_tokens;
@@ -1308,39 +1420,6 @@ void preprocess()
             set_source_token_replaced(pop_token());
             vector_push_back(dst, new_ident("HLT"));
             set_source_token_replaced(NULL);
-        }
-
-        if (match_token(K_BEGIN)) {
-            set_source_token_replaced(pop_token());
-
-            char *ns_name = NULL;
-            if (pop_token_if(T_LPAREN)) {
-                ns_name = expect_ident();
-                expect_token(T_RPAREN);
-            }
-            else {
-                ns_name = create_temporary_ns_name();
-            }
-
-            vector_push_back(dst, new_labelns_begin(ns_name));
-
-            set_source_token_replaced(NULL);
-            continue;
-        }
-
-        if (match_token(K_END)) {
-            set_source_token_replaced(pop_token());
-
-            char *ns_name = NULL;
-            if (pop_token_if(T_LPAREN)) {
-                ns_name = expect_ident();
-                expect_token(T_RPAREN);
-            }
-
-            vector_push_back(dst, new_labelns_end(ns_name));
-
-            set_source_token_replaced(NULL);
-            continue;
         }
 
         while (peek_token() != NULL && !pop_token_if(T_NEWLINE))

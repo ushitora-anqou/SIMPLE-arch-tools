@@ -1095,6 +1095,64 @@ R0 = 10
 halt
 " 10
 
+test_macro "
+begin
+    alloc a, b, c, d, e, f, g, h
+end
+alloc a, b, c, d, e, f, g, h
+free a, b, c, d, e, f, g, h
+R0 = 10
+halt
+" 10
+
+test_macro "
+inline hoge() {
+    alloc a, b, c, d, e, f
+    begin
+        alloc h
+    end
+    begin
+        alloc h
+        begin
+            alloc i
+        end
+        alloc i
+    end
+    alloc h
+}
+
+hoge()
+hoge()
+alloc a, b, c, d, e, f, g, h
+R0 = 10
+halt
+" 10
+
+test_macro "
+inline hoge() {
+    alloc a, b, c, d, e, f
+    begin
+        alloc h
+    end
+    begin
+        alloc h
+        begin
+            alloc i
+            free i
+        end
+        alloc i
+        free h
+    end
+    alloc h
+}
+
+hoge()
+hoge()
+alloc a, b, c, d, e, f, g, h
+R0 = 10
+halt
+" 10
+
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null
@@ -1122,7 +1180,7 @@ test_macro_error "JMP hoge" "Undeclared label.+hoge"
 
 test_macro_error "R1 += +=" "1:7:.+Unexpected token.+register"
 
-test_macro_error "end(hoge)" "1:1:.+Invalid end of label namespace"
+test_macro_error "end(hoge)" "1:1:.+Too much 'end' token.+'hoge'"
 
 test_macro_error "begin(hoge) end(foo)" "1:13:.+Invalid end of label namespace"
 
@@ -1239,5 +1297,52 @@ halt" ":8:"
 test_macro_error "
 free hoge
 halt" ":2:1:.+'hoge'"
+
+test_macro_error "
+inline hoge() {
+    alloc a, b, c, d, e, f, g
+    begin
+        alloc h
+    end
+    begin
+        alloc h
+        begin
+            alloc i
+        end
+    end
+    alloc h
+}
+
+hoge()
+hoge()
+alloc a, b, c, d, e, f, g, h
+R0 = 10
+halt" ":10:13:.+'i'"
+
+test_macro_error "
+inline hoge() {
+    alloc a, b, c, d, e, f
+    begin
+        alloc h
+    end
+    begin
+        alloc h
+        begin
+            alloc i
+            free i
+            free h
+        end
+        alloc i
+        free h
+    end
+    alloc h
+}
+
+hoge()
+hoge()
+alloc a, b, c, d, e, f, g, h
+R0 = 10
+halt" "12:13:.+No such register allocation.+'h'"
+
 
 echo "ok"
