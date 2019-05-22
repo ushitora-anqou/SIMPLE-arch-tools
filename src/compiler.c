@@ -735,6 +735,8 @@ AST *new_binop_ast(AST_KIND kind, AST *lhs, AST *rhs)
 
 AST *parse_expr(void);
 AST *parse_stmt(void);
+int match_declaration(void);
+Vector *parse_var_decls(void);
 
 AST *parse_unsigned_integer(void)
 {
@@ -753,7 +755,7 @@ AST *parse_primary(void)
     }
 
     if (match_token2(T_IDENT, T_LBRACKET)) {
-        Token *ident_token = pop_token();
+        pop_token();  // discard T_IDENT
         pop_token();  // discard T_LBRACKET
         AST *ast = parse_expr();
         expect_token(T_RBRACKET);
@@ -914,7 +916,12 @@ AST *parse_compound_stmt(void)
     Vector *stmts = new_vector();
 
     expect_token(T_LBRACE);
-    while (!pop_token_if(T_RBRACE)) vector_push_back(stmts, parse_stmt());
+    while (!pop_token_if(T_RBRACE)) {
+        if (match_declaration())
+            vector_push_back_vector(stmts, parse_var_decls());
+        else
+            vector_push_back(stmts, parse_stmt());
+    }
 
     AST *ast = new_ast_wo_loc(AST_COMPOUND);
     ast->stmts = stmts;
@@ -974,6 +981,11 @@ AST *parse_stmt(void)
     return parse_expr_stmt();
 }
 
+int match_declaration(void)
+{
+    return !!match_token(K_INT);
+}
+
 Vector *parse_var_decls(void)
 {
     Vector *decls = new_vector();
@@ -992,7 +1004,7 @@ Vector *parse(void)
 {
     Vector *stmts = new_vector();
     while (peek_token()) {
-        if (match_token(K_INT))
+        if (match_declaration())
             vector_push_back_vector(stmts, parse_var_decls());
         else
             vector_push_back(stmts, parse_stmt());
@@ -1000,7 +1012,37 @@ Vector *parse(void)
     return stmts;
 }
 
-AST *analyze_detail(AST *ast, Map *alphatbl)
+typedef struct AnalysisEnv AnalysisEnv;
+struct AnalysisEnv {
+    AnalysisEnv *parent;
+    Map *alphatbl;
+};
+
+AnalysisEnv *new_analysis_env(AnalysisEnv *parent)
+{
+    AnalysisEnv *env = (AnalysisEnv *)malloc(sizeof(AnalysisEnv));
+    env->parent = parent;
+    env->alphatbl = new_map();
+    return env;
+}
+
+char *ae_lookup_alphatbl(AnalysisEnv *env, char *key)
+{
+    assert(env != NULL);
+
+    KeyValue *kv = map_lookup(env->alphatbl, key);
+    if (kv != NULL) return kv->value;
+    if (env->parent != NULL) return ae_lookup_alphatbl(env->parent, key);
+    return NULL;
+}
+
+int count(void)
+{
+    static int index = 0;
+    return index++;
+}
+
+AST *analyze_detail(AST *ast, AnalysisEnv *env)
 {
     switch (ast->kind) {
     case AST_INTEGER:
@@ -1014,29 +1056,29 @@ AST *analyze_detail(AST *ast, Map *alphatbl)
     case AST_LTE:
     case AST_EQ:
     case AST_NEQ:
-        ast->lhs = analyze_detail(ast->lhs, alphatbl);
-        ast->rhs = analyze_detail(ast->rhs, alphatbl);
+        ast->lhs = analyze_detail(ast->lhs, env);
+        ast->rhs = analyze_detail(ast->rhs, env);
         break;
 
     case AST_GT:
-        ast = new_binop_ast(AST_LT, analyze_detail(ast->rhs, alphatbl),
-                            analyze_detail(ast->lhs, alphatbl));
+        ast = new_binop_ast(AST_LT, analyze_detail(ast->rhs, env),
+                            analyze_detail(ast->lhs, env));
         break;
 
     case AST_GTE:
-        ast = new_binop_ast(AST_LTE, analyze_detail(ast->rhs, alphatbl),
-                            analyze_detail(ast->lhs, alphatbl));
+        ast = new_binop_ast(AST_LTE, analyze_detail(ast->rhs, env),
+                            analyze_detail(ast->lhs, env));
         break;
 
     case AST_EXPR_STMT:
     case AST_RETURN:
     case AST_MEM_READ:
-        ast->ast = analyze_detail(ast->ast, alphatbl);
+        ast->ast = analyze_detail(ast->ast, env);
         break;
 
     case AST_MEM_WRITE:
-        ast->mem_write.addr = analyze_detail(ast->mem_write.addr, alphatbl);
-        ast->mem_write.rhs = analyze_detail(ast->mem_write.rhs, alphatbl);
+        ast->mem_write.addr = analyze_detail(ast->mem_write.addr, env);
+        ast->mem_write.rhs = analyze_detail(ast->mem_write.rhs, env);
         break;
 
     case AST_LNOT:
@@ -1044,79 +1086,77 @@ AST *analyze_detail(AST *ast, Map *alphatbl)
         switch (ast->ast->kind) {
         case AST_LT:
             ast->ast->kind = AST_GTE;
-            ast = analyze_detail(ast->ast, alphatbl);
+            ast = analyze_detail(ast->ast, env);
             break;
         case AST_LTE:
             ast->ast->kind = AST_GT;
-            ast = analyze_detail(ast->ast, alphatbl);
+            ast = analyze_detail(ast->ast, env);
             break;
         case AST_GT:
             ast->ast->kind = AST_LTE;
-            ast = analyze_detail(ast->ast, alphatbl);
+            ast = analyze_detail(ast->ast, env);
             break;
         case AST_GTE:
             ast->ast->kind = AST_LT;
-            ast = analyze_detail(ast->ast, alphatbl);
+            ast = analyze_detail(ast->ast, env);
             break;
         default:
-            ast->ast = analyze_detail(ast->ast, alphatbl);
+            ast->ast = analyze_detail(ast->ast, env);
             break;
         }
         break;
 
     case AST_IF:
-        ast->if_cond = analyze_detail(ast->if_cond, alphatbl);
+        ast->if_cond = analyze_detail(ast->if_cond, env);
+        ast->if_body = analyze_detail(ast->if_body, env);
         break;
 
-    case AST_COMPOUND:
+    case AST_COMPOUND: {
+        AnalysisEnv *newenv = new_analysis_env(env);
         for (int i = 0; i < vector_size(ast->stmts); i++)
             vector_set(
                 ast->stmts, i,
-                analyze_detail((AST *)vector_get(ast->stmts, i), alphatbl));
-        break;
+                analyze_detail((AST *)vector_get(ast->stmts, i), newenv));
+    } break;
 
     case AST_VAR: {
         // alpha conversion
-        KeyValue *kv = map_lookup(alphatbl, ast->sval);
-        if (kv == NULL)
+        char *new_varname = ae_lookup_alphatbl(env, ast->sval);
+        if (new_varname == NULL)
             failwith(&ast->loc, "Not declared variable: " HL_IDENT, ast->sval);
-        ast->sval = kv->value;
+        ast->sval = new_varname;
     } break;
 
     case AST_VAR_DECL: {
         // alpha conversion
-        KeyValue *kv = map_lookup(alphatbl, ast->sval);
-        if (kv != NULL)
+        if (map_lookup(env->alphatbl, ast->sval) != NULL)
             failwith(&ast->loc, "Duplicate variable declaration: " HL_IDENT,
                      ast->sval);
-        char *newname = format("%s.%d", ast->sval, map_size(alphatbl));
-        map_insert(alphatbl, ast->sval, newname);
+        char *newname = format("%s.%d", ast->sval, count());
+        map_insert(env->alphatbl, ast->sval, newname);
         ast->sval = newname;
     } break;
 
     case AST_ASSIGN: {
         // alpha conversion
-        KeyValue *kv = map_lookup(alphatbl, ast->assign.varname);
-        if (kv == NULL)
+        char *new_varname = ae_lookup_alphatbl(env, ast->assign.varname);
+        if (new_varname == NULL)
             failwith(&ast->loc, "Not declared variable: " HL_IDENT,
                      ast->assign.varname);
-        ast->assign.varname = kv->value;
-        ast->assign.rhs = analyze_detail(ast->assign.rhs, alphatbl);
+        ast->assign.varname = new_varname;
+        ast->assign.rhs = analyze_detail(ast->assign.rhs, env);
     } break;
 
     case AST_WHILE: {
-        ast->while_cond = analyze_detail(ast->while_cond, alphatbl);
-        ast->while_body = analyze_detail(ast->while_body, alphatbl);
+        ast->while_cond = analyze_detail(ast->while_cond, env);
+        ast->while_body = analyze_detail(ast->while_body, env);
     } break;
 
     case AST_FOR: {
-        if (ast->for_init)
-            ast->for_init = analyze_detail(ast->for_init, alphatbl);
-        if (ast->for_cond)
-            ast->for_cond = analyze_detail(ast->for_cond, alphatbl);
-        if (ast->for_iter)
-            ast->for_iter = analyze_detail(ast->for_iter, alphatbl);
-        ast->for_body = analyze_detail(ast->for_body, alphatbl);
+        if (ast->for_init) ast->for_init = analyze_detail(ast->for_init, env);
+        if (ast->for_cond) ast->for_cond = analyze_detail(ast->for_cond, env);
+        if (ast->for_iter) ast->for_iter = analyze_detail(ast->for_iter, env);
+        ast->for_body = analyze_detail(ast->for_body, env);
     } break;
     }
 
@@ -1126,15 +1166,15 @@ AST *analyze_detail(AST *ast, Map *alphatbl)
 Vector *analyze(Vector *src)
 {
     Vector *dst = new_vector();
-    Map *alphatbl = new_map();
+    AnalysisEnv *env = new_analysis_env(NULL);
 
     for (int i = 0; i < vector_size(src); i++) {
         AST *ast = (AST *)vector_get(src, i);
         assert(ast != NULL);
-        vector_push_back(dst, analyze_detail(ast, alphatbl));
+        vector_push_back(dst, analyze_detail(ast, env));
     }
 
-    free(alphatbl);
+    free(env);
 
     return dst;
 }
