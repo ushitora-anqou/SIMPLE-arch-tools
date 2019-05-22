@@ -256,6 +256,7 @@ struct Token_tag {
         K_RETURN,
         K_INT,
         K_WHILE,
+        K_FOR,
     } kind;
 
     union {
@@ -321,6 +322,8 @@ const char *token2str(Token *token)
         return "int";
     case K_WHILE:
         return "while";
+    case K_FOR:
+        return "for";
     }
     assert(0);
 }
@@ -405,6 +408,10 @@ Token *next_token()
             }
             if (streql(sval, "while")) {
                 token->kind = K_WHILE;
+                return token;
+            }
+            if (streql(sval, "for")) {
+                token->kind = K_FOR;
                 return token;
             }
 
@@ -647,6 +654,7 @@ struct AST {
         AST_VAR_DECL,
         AST_ASSIGN,
         AST_WHILE,
+        AST_FOR,
     } kind;
 
     union {
@@ -670,6 +678,10 @@ struct AST {
 
         struct {
             AST *while_cond, *while_body;
+        };
+
+        struct {
+            AST *for_init, *for_cond, *for_iter, *for_body;
         };
     };
 };
@@ -870,7 +882,7 @@ AST *parse_compound_stmt(void)
     return ast;
 }
 
-AST *parse_iteration_stmt(void)
+AST *parse_iteration_while_stmt(void)
 {
     Token *while_token = expect_token(K_WHILE);
     expect_token(T_LPAREN);
@@ -884,12 +896,33 @@ AST *parse_iteration_stmt(void)
     return ast;
 }
 
+AST *parse_iteration_for_stmt(void)
+{
+    Token *for_token = expect_token(K_FOR);
+    expect_token(T_LPAREN);
+    AST *init = parse_expr();
+    expect_token(T_SEMICOLON);
+    AST *cond = parse_expr();
+    expect_token(T_SEMICOLON);
+    AST *iter = parse_expr();
+    expect_token(T_RPAREN);
+    AST *body = parse_stmt();
+
+    AST *ast = new_ast(AST_FOR, for_token->loc);
+    ast->for_init = init;
+    ast->for_cond = cond;
+    ast->for_iter = iter;
+    ast->for_body = body;
+    return ast;
+}
+
 AST *parse_stmt(void)
 {
     if (match_token(K_RETURN)) return parse_jump_stmt();
     if (match_token(K_IF)) return parse_selection_stmt();
     if (match_token(T_LBRACE)) return parse_compound_stmt();
-    if (match_token(K_WHILE)) return parse_iteration_stmt();
+    if (match_token(K_WHILE)) return parse_iteration_while_stmt();
+    if (match_token(K_FOR)) return parse_iteration_for_stmt();
     return parse_expr_stmt();
 }
 
@@ -1018,6 +1051,13 @@ AST *analyze_detail(AST *ast, Map *alphatbl)
     case AST_WHILE: {
         ast->while_cond = analyze_detail(ast->while_cond, alphatbl);
         ast->while_body = analyze_detail(ast->while_body, alphatbl);
+    } break;
+
+    case AST_FOR: {
+        ast->for_init = analyze_detail(ast->for_init, alphatbl);
+        ast->for_cond = analyze_detail(ast->for_cond, alphatbl);
+        ast->for_iter = analyze_detail(ast->for_iter, alphatbl);
+        ast->for_body = analyze_detail(ast->for_body, alphatbl);
     } break;
     }
 
@@ -1274,6 +1314,30 @@ int generate_code_detail(AST *ast)
         emit("CMP R%d, 0", reg_index);
         emit("BE %s", exit_label);
         assert(generate_code_detail(ast->while_body) == -1);
+        emit("B %s", loop_label);
+        emit("%s:", exit_label);
+
+        return -1;
+    }
+
+    case AST_FOR: {
+        int reg_index;
+        char *exit_label = make_label(), *loop_label = make_label();
+
+        reg_index = generate_code_detail(ast->for_init);
+        assert(reg_index != -1);
+        give_reg_back(reg_index);
+
+        emit("%s:", loop_label);
+        reg_index = generate_code_detail(ast->for_cond);
+        assert(reg_index != -1);
+        give_reg_back(reg_index);
+        emit("CMP R%d, 0", reg_index);
+        emit("BE %s", exit_label);
+        assert(generate_code_detail(ast->for_body) == -1);
+        reg_index = generate_code_detail(ast->for_iter);
+        assert(reg_index != -1);
+        give_reg_back(reg_index);
         emit("B %s", loop_label);
         emit("%s:", exit_label);
 
