@@ -8,7 +8,8 @@
 #include "utility.h"
 
 typedef struct Token_tag Token;
-_Noreturn void failwith(Token *cause, const char *msg, ...);
+typedef struct CodeLocation CodeLocation;
+_Noreturn void failwith(CodeLocation *loc, const char *msg, ...);
 
 typedef struct Vector Vector;
 struct Vector {
@@ -218,7 +219,6 @@ void unget_char(void)
     }
 }
 
-typedef struct CodeLocation CodeLocation;
 struct CodeLocation {
     int line_row, line_column;
     char *read_line;
@@ -254,6 +254,7 @@ struct Token_tag {
         T_EXCLAM,
         K_IF,
         K_RETURN,
+        K_INT,
     } kind;
 
     union {
@@ -315,6 +316,8 @@ const char *token2str(Token *token)
         return "if";
     case K_RETURN:
         return "return";
+    case K_INT:
+        return "int";
     }
     assert(0);
 }
@@ -349,7 +352,8 @@ const char *tokenkind2str(int kind)
     case T_SEMICOLON:
     case T_EXCLAM:
     case K_RETURN:
-    case K_IF: {
+    case K_IF:
+    case K_INT: {
         Token token = {.kind = kind};
         return token2str(&token);
     }
@@ -357,7 +361,7 @@ const char *tokenkind2str(int kind)
     assert(0);
 }
 
-_Noreturn void failwith(Token *cause, const char *msg, ...)
+_Noreturn void failwith(CodeLocation *loc, const char *msg, ...)
 {
     char buf[512];
     va_list args;
@@ -365,8 +369,8 @@ _Noreturn void failwith(Token *cause, const char *msg, ...)
     vsnprintf(buf, 512, msg, args);
     va_end(args);
 
-    if (cause)
-        error_at(cause->loc.line_row + 1, cause->loc.line_column + 1, buf);
+    if (loc)
+        error_at(loc->line_row + 1, loc->line_column + 1, buf);
     else
         error_at(line_row + 1, line_column + 1, buf);
 }
@@ -377,7 +381,7 @@ _Noreturn void failwith(Token *cause, const char *msg, ...)
 _Noreturn void failwith_unexpected_token(Token *token, const char *got,
                                          const char *expected)
 {
-    failwith(token,
+    failwith(&token->loc,
              "Unexpected token: got \e[1m'%s'\e[m but expected \e[1m'%s'\e[m",
              got, expected);
 }
@@ -413,6 +417,10 @@ Token *next_token()
             }
             if (streql(sval, "return")) {
                 token->kind = K_RETURN;
+                return token;
+            }
+            if (streql(sval, "int")) {
+                token->kind = K_INT;
                 return token;
             }
 
@@ -642,10 +650,13 @@ struct AST {
         AST_IF,
         AST_LNOT,
         AST_COMPOUND,
+        AST_VAR,
+        AST_VAR_DECL,
     } kind;
 
     union {
         int ival;
+        char *sval;
         Vector *exprs, *stmts;
         AST *ast;
 
@@ -708,6 +719,13 @@ AST *parse_primary(void)
     if (pop_token_if(T_LPAREN)) {
         AST *ast = parse_expr();
         expect_token(T_RPAREN);
+        return ast;
+    }
+
+    if (match_token(T_IDENT)) {
+        Token *token = pop_token();
+        AST *ast = new_ast(AST_VAR, token->loc);
+        ast->sval = token->sval;
         return ast;
     }
 
@@ -839,14 +857,31 @@ AST *parse_stmt(void)
     return parse_expr_stmt();
 }
 
+AST *parse_var_decl(void)
+{
+    Token *int_token = expect_token(K_INT);
+    char *varname = expect_token(T_IDENT)->sval;
+    expect_token(T_SEMICOLON);
+    AST *ast = new_ast(AST_VAR_DECL, int_token->loc);
+    ast->sval = varname;
+    return ast;
+}
+
 Vector *parse(void)
 {
     Vector *stmts = new_vector();
-    while (peek_token()) vector_push_back(stmts, parse_stmt());
+    while (peek_token()) {
+        AST *ast;
+        if (match_token(K_INT))
+            ast = parse_var_decl();
+        else
+            ast = parse_stmt();
+        vector_push_back(stmts, ast);
+    }
     return stmts;
 }
 
-AST *analyze_detail(AST *ast)
+AST *analyze_detail(AST *ast, Map *alphatbl)
 {
     switch (ast->kind) {
     case AST_INTEGER:
@@ -860,23 +895,23 @@ AST *analyze_detail(AST *ast)
     case AST_LTE:
     case AST_EQ:
     case AST_NEQ:
-        ast->lhs = analyze_detail(ast->lhs);
-        ast->rhs = analyze_detail(ast->rhs);
+        ast->lhs = analyze_detail(ast->lhs, alphatbl);
+        ast->rhs = analyze_detail(ast->rhs, alphatbl);
         break;
 
     case AST_GT:
-        ast = new_binop_ast(AST_LT, analyze_detail(ast->rhs),
-                            analyze_detail(ast->lhs));
+        ast = new_binop_ast(AST_LT, analyze_detail(ast->rhs, alphatbl),
+                            analyze_detail(ast->lhs, alphatbl));
         break;
 
     case AST_GTE:
-        ast = new_binop_ast(AST_LTE, analyze_detail(ast->rhs),
-                            analyze_detail(ast->lhs));
+        ast = new_binop_ast(AST_LTE, analyze_detail(ast->rhs, alphatbl),
+                            analyze_detail(ast->lhs, alphatbl));
         break;
 
     case AST_EXPR_STMT:
     case AST_RETURN:
-        ast->ast = analyze_detail(ast->ast);
+        ast->ast = analyze_detail(ast->ast, alphatbl);
         break;
 
     case AST_LNOT:
@@ -884,35 +919,55 @@ AST *analyze_detail(AST *ast)
         switch (ast->ast->kind) {
         case AST_LT:
             ast->ast->kind = AST_GTE;
-            ast = analyze_detail(ast->ast);
+            ast = analyze_detail(ast->ast, alphatbl);
             break;
         case AST_LTE:
             ast->ast->kind = AST_GT;
-            ast = analyze_detail(ast->ast);
+            ast = analyze_detail(ast->ast, alphatbl);
             break;
         case AST_GT:
             ast->ast->kind = AST_LTE;
-            ast = analyze_detail(ast->ast);
+            ast = analyze_detail(ast->ast, alphatbl);
             break;
         case AST_GTE:
             ast->ast->kind = AST_LT;
-            ast = analyze_detail(ast->ast);
+            ast = analyze_detail(ast->ast, alphatbl);
             break;
         default:
-            ast->ast = analyze_detail(ast->ast);
+            ast->ast = analyze_detail(ast->ast, alphatbl);
             break;
         }
         break;
 
     case AST_IF:
-        ast->if_cond = analyze_detail(ast->if_cond);
+        ast->if_cond = analyze_detail(ast->if_cond, alphatbl);
         break;
 
     case AST_COMPOUND:
         for (int i = 0; i < vector_size(ast->stmts); i++)
-            vector_set(ast->stmts, i,
-                       analyze_detail((AST *)vector_get(ast->stmts, i)));
+            vector_set(
+                ast->stmts, i,
+                analyze_detail((AST *)vector_get(ast->stmts, i), alphatbl));
         break;
+
+    case AST_VAR: {
+        // alpha conversion
+        KeyValue *kv = map_lookup(alphatbl, ast->sval);
+        if (kv == NULL)
+            failwith(&ast->loc, "Not declared variable: " HL_IDENT, ast->sval);
+        ast->sval = kv->value;
+    } break;
+
+    case AST_VAR_DECL: {
+        // alpha conversion
+        KeyValue *kv = map_lookup(alphatbl, ast->sval);
+        if (kv != NULL)
+            failwith(&ast->loc, "Duplicate variable declaration: " HL_IDENT,
+                     ast->sval);
+        char *newname = format("%s.%d", ast->sval, map_size(alphatbl));
+        map_insert(alphatbl, ast->sval, newname);
+        ast->sval = newname;
+    } break;
     }
 
     return ast;
@@ -921,12 +976,15 @@ AST *analyze_detail(AST *ast)
 Vector *analyze(Vector *src)
 {
     Vector *dst = new_vector();
+    Map *alphatbl = new_map();
 
     for (int i = 0; i < vector_size(src); i++) {
         AST *ast = (AST *)vector_get(src, i);
         assert(ast != NULL);
-        vector_push_back(dst, analyze_detail(ast));
+        vector_push_back(dst, analyze_detail(ast, alphatbl));
     }
+
+    free(alphatbl);
 
     return dst;
 }
@@ -934,15 +992,18 @@ Vector *analyze(Vector *src)
 typedef struct GenEnv GenEnv;
 struct GenEnv {
     FILE *fh;
-    int label_index, reg_used_flag[8];
+    int var_disp_index, label_index, reg_used_flag[8];
+    Map *var2disp;
 };
 
 GenEnv *new_gen_env(FILE *fh)
 {
     GenEnv *env = (GenEnv *)malloc(sizeof(GenEnv));
     env->fh = fh;
+    env->var_disp_index = 0;
     env->label_index = 0;
     for (int i = 0; i < 8; i++) env->reg_used_flag[i] = 0;
+    env->var2disp = new_map();
 
     return env;
 }
@@ -1129,9 +1190,26 @@ int generate_code_detail(AST *ast)
         return -1;
     }
 
-    default:
+    case AST_VAR: {
+        KeyValue *kv = map_lookup(env->var2disp, ast->sval);
+        assert(kv != NULL);
+        int disp = (int)kv->value;
+        int reg_index = get_reg();
+        emit("LD R%d, %d(SP)", reg_index, disp);
+        return reg_index;
+    }
+
+    case AST_VAR_DECL: {
+        assert(map_lookup(env->var2disp, ast->sval) == NULL);
+        map_insert(env->var2disp, ast->sval, (void *)(env->var_disp_index++));
+        return -1;
+    }
+
+    case AST_GT:
+    case AST_GTE:
         assert(0);
     }
+    assert(0);
 }
 
 void generate_code(FILE *fh, Vector *ast)
@@ -1140,11 +1218,17 @@ void generate_code(FILE *fh, Vector *ast)
 
     env = new_gen_env(fh);
 
+    int sp_reg_index = get_reg();
+    emit("define SP R%d", sp_reg_index);
+    emit("LI SP, 0");
+
     for (int i = 0; i < vector_size(ast); i++) {
         AST *stmt = (AST *)vector_get(ast, i);
         int reg_index = generate_code_detail(stmt);
         assert(reg_index == -1);
     }
+
+    give_reg_back(sp_reg_index);
 }
 
 int main()
