@@ -622,6 +622,15 @@ Token *match_token(int kind)
     return NULL;
 }
 
+int match_token2(int kind0, int kind1)
+{
+    Token *token0 = (Token *)vector_get(input_tokens, input_tokens_npos),
+          *token1 = (Token *)vector_get(input_tokens, input_tokens_npos + 1);
+
+    if (token0 == NULL || token1 == NULL) return 0;
+    return token0->kind == kind0 && token1->kind == kind1;
+}
+
 Token *pop_token_if(int kind)
 {
     if (match_token(kind)) return pop_token();
@@ -652,6 +661,7 @@ struct AST {
         AST_COMPOUND,
         AST_VAR,
         AST_VAR_DECL,
+        AST_ASSIGN,
     } kind;
 
     union {
@@ -663,9 +673,15 @@ struct AST {
         struct {
             AST *lhs, *rhs;
         };
+
         struct {
             AST *if_cond, *if_body;
         };
+
+        struct {
+            char *varname;
+            AST *rhs;
+        } assign;
     };
 };
 
@@ -802,9 +818,25 @@ AST *parse_equality(void)
     return lhs;
 }
 
+AST *parse_assignment(void)
+{
+    if (match_token2(T_IDENT, T_EQ)) {
+        Token *ident_token = pop_token();
+        char *varname = ident_token->sval;
+        pop_token();
+        AST *rhs = parse_assignment();
+        AST *ast = new_ast(AST_ASSIGN, ident_token->loc);
+        ast->assign.varname = varname;
+        ast->assign.rhs = rhs;
+        return ast;
+    }
+
+    return parse_equality();
+}
+
 AST *parse_expr(void)
 {
-    return parse_equality();
+    return parse_assignment();
 }
 
 AST *parse_expr_stmt(void)
@@ -968,6 +1000,17 @@ AST *analyze_detail(AST *ast, Map *alphatbl)
         map_insert(alphatbl, ast->sval, newname);
         ast->sval = newname;
     } break;
+
+    case AST_ASSIGN: {
+        // alpha conversion
+        KeyValue *kv = map_lookup(alphatbl, ast->assign.varname);
+        if (kv == NULL)
+            failwith(&ast->loc, "Not declared variable: " HL_IDENT,
+                     ast->assign.varname);
+        ast->assign.varname = kv->value;
+        ast->assign.rhs = analyze_detail(ast->assign.rhs, alphatbl);
+        break;
+    }
     }
 
     return ast;
@@ -1203,6 +1246,15 @@ int generate_code_detail(AST *ast)
         assert(map_lookup(env->var2disp, ast->sval) == NULL);
         map_insert(env->var2disp, ast->sval, (void *)(env->var_disp_index++));
         return -1;
+    }
+
+    case AST_ASSIGN: {
+        KeyValue *kv = map_lookup(env->var2disp, ast->assign.varname);
+        assert(kv != NULL);
+        int disp = (int)kv->value;
+        int reg_index = generate_code_detail(ast->assign.rhs);
+        emit("ST R%d, %d(SP)", reg_index, disp);
+        return reg_index;
     }
 
     case AST_GT:

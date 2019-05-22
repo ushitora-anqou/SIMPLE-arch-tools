@@ -1397,5 +1397,9 @@ test_compiler "return 3 > 2;" 1
 test_compiler "return 1 >= 2;" 0
 test_compiler "return 2 >= 2;" 1
 test_compiler "return 3 >= 2;" 1
+test_compiler "int a; a = 3; return a;" 3
+test_compiler "int a; a = 3 + 5; return a;" 8
+test_compiler "int a; int b; a = 10; b = 0-10; a = a + b; return a;" 0
+test_compiler "int a; int b; a = b = 10; b = 0-a; a = a + b; return a;" 0
 
 echo "ok"
