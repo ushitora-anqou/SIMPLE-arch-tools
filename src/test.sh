@@ -1409,5 +1409,4 @@ test_compiler "for(;;) { return 10; }" 10
 test_compiler "mem[42] = 5; return mem[42];" 5
 test_compiler "int i; mem[42] = 0; for (i = 0; i < 10; i = i + 1) mem[42] = mem[42] + i; return mem[42];" 45
 test_compiler "int i; i = 3; mem[i + i] = i; return mem[i + i];" 3
-
-echo "ok"
+test_compiler "int i, j, sum; for (i = 0; i < 10; i = i + 1) for (j = 0; j < 10; j = j + 1) sum = sum + 1; return sum;" 100

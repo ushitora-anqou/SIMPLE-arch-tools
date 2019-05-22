@@ -974,26 +974,28 @@ AST *parse_stmt(void)
     return parse_expr_stmt();
 }
 
-AST *parse_var_decl(void)
+Vector *parse_var_decls(void)
 {
+    Vector *decls = new_vector();
     Token *int_token = expect_token(K_INT);
-    char *varname = expect_token(T_IDENT)->sval;
+    do {
+        char *varname = expect_token(T_IDENT)->sval;
+        AST *ast = new_ast(AST_VAR_DECL, int_token->loc);
+        ast->sval = varname;
+        vector_push_back(decls, ast);
+    } while (pop_token_if(T_COMMA));
     expect_token(T_SEMICOLON);
-    AST *ast = new_ast(AST_VAR_DECL, int_token->loc);
-    ast->sval = varname;
-    return ast;
+    return decls;
 }
 
 Vector *parse(void)
 {
     Vector *stmts = new_vector();
     while (peek_token()) {
-        AST *ast;
         if (match_token(K_INT))
-            ast = parse_var_decl();
+            vector_push_back_vector(stmts, parse_var_decls());
         else
-            ast = parse_stmt();
-        vector_push_back(stmts, ast);
+            vector_push_back(stmts, parse_stmt());
     }
     return stmts;
 }
