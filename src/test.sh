@@ -1401,5 +1401,6 @@ test_compiler "int a; a = 3; return a;" 3
 test_compiler "int a; a = 3 + 5; return a;" 8
 test_compiler "int a; int b; a = 10; b = 0-10; a = a + b; return a;" 0
 test_compiler "int a; int b; a = b = 10; b = 0-a; a = a + b; return a;" 0
+test_compiler "int a; a = 0; int i; i = 0; while (i < 10) { i = i + 1; a = a + 2; } return a; " 20
 
 echo "ok"

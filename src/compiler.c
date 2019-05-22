@@ -255,6 +255,7 @@ struct Token_tag {
         K_IF,
         K_RETURN,
         K_INT,
+        K_WHILE,
     } kind;
 
     union {
@@ -318,6 +319,8 @@ const char *token2str(Token *token)
         return "return";
     case K_INT:
         return "int";
+    case K_WHILE:
+        return "while";
     }
     assert(0);
 }
@@ -330,30 +333,7 @@ const char *tokenkind2str(int kind)
     case T_INTEGER:
         return "integer";
 
-    case T_COMMA:
-    case T_LBRACKET:
-    case T_RBRACKET:
-    case T_LBRACE:
-    case T_RBRACE:
-    case T_LPAREN:
-    case T_RPAREN:
-    case T_PLUS:
-    case T_MINUS:
-    case T_COLON:
-    case T_EQ:
-    case T_EQEQ:
-    case T_NEQ:
-    case T_LT:
-    case T_LTEQ:
-    case T_GT:
-    case T_GTEQ:
-    case T_LTLT:
-    case T_GTGT:
-    case T_SEMICOLON:
-    case T_EXCLAM:
-    case K_RETURN:
-    case K_IF:
-    case K_INT: {
+    default: {
         Token token = {.kind = kind};
         return token2str(&token);
     }
@@ -421,6 +401,10 @@ Token *next_token()
             }
             if (streql(sval, "int")) {
                 token->kind = K_INT;
+                return token;
+            }
+            if (streql(sval, "while")) {
+                token->kind = K_WHILE;
                 return token;
             }
 
@@ -662,6 +646,7 @@ struct AST {
         AST_VAR,
         AST_VAR_DECL,
         AST_ASSIGN,
+        AST_WHILE,
     } kind;
 
     union {
@@ -682,6 +667,10 @@ struct AST {
             char *varname;
             AST *rhs;
         } assign;
+
+        struct {
+            AST *while_cond, *while_body;
+        };
     };
 };
 
@@ -881,11 +870,26 @@ AST *parse_compound_stmt(void)
     return ast;
 }
 
+AST *parse_iteration_stmt(void)
+{
+    Token *while_token = expect_token(K_WHILE);
+    expect_token(T_LPAREN);
+    AST *cond = parse_expr();
+    expect_token(T_RPAREN);
+    AST *body = parse_stmt();
+
+    AST *ast = new_ast(AST_WHILE, while_token->loc);
+    ast->while_cond = cond;
+    ast->while_body = body;
+    return ast;
+}
+
 AST *parse_stmt(void)
 {
     if (match_token(K_RETURN)) return parse_jump_stmt();
     if (match_token(K_IF)) return parse_selection_stmt();
     if (match_token(T_LBRACE)) return parse_compound_stmt();
+    if (match_token(K_WHILE)) return parse_iteration_stmt();
     return parse_expr_stmt();
 }
 
@@ -1009,8 +1013,12 @@ AST *analyze_detail(AST *ast, Map *alphatbl)
                      ast->assign.varname);
         ast->assign.varname = kv->value;
         ast->assign.rhs = analyze_detail(ast->assign.rhs, alphatbl);
-        break;
-    }
+    } break;
+
+    case AST_WHILE: {
+        ast->while_cond = analyze_detail(ast->while_cond, alphatbl);
+        ast->while_body = analyze_detail(ast->while_body, alphatbl);
+    } break;
     }
 
     return ast;
@@ -1255,6 +1263,21 @@ int generate_code_detail(AST *ast)
         int reg_index = generate_code_detail(ast->assign.rhs);
         emit("ST R%d, %d(SP)", reg_index, disp);
         return reg_index;
+    }
+
+    case AST_WHILE: {
+        char *exit_label = make_label(), *loop_label = make_label();
+
+        emit("%s:", loop_label);
+        int reg_index = generate_code_detail(ast->while_cond);
+        give_reg_back(reg_index);
+        emit("CMP R%d, 0", reg_index);
+        emit("BE %s", exit_label);
+        assert(generate_code_detail(ast->while_body) == -1);
+        emit("B %s", loop_label);
+        emit("%s:", exit_label);
+
+        return -1;
     }
 
     case AST_GT:
