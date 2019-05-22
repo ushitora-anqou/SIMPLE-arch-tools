@@ -574,6 +574,13 @@ unrecognized_character:
 static Vector *input_tokens;
 static int input_tokens_npos;
 
+#define SAVE_CURRENT_INPUT_TOKENS                   \
+    Vector *tmp__saved_input_tokens = input_tokens; \
+    int tmp__saved_input_tokens_npos = input_tokens_npos;
+#define RESTORE_CURRENT_INPUT_TOKENS        \
+    input_tokens = tmp__saved_input_tokens; \
+    input_tokens_npos = tmp__saved_input_tokens_npos;
+
 void read_all_tokens(FILE *fh)
 {
     read_all_lines(fh);
@@ -655,6 +662,8 @@ struct AST {
         AST_ASSIGN,
         AST_WHILE,
         AST_FOR,
+        AST_MEM_READ,
+        AST_MEM_WRITE,
     } kind;
 
     union {
@@ -683,6 +692,10 @@ struct AST {
         struct {
             AST *for_init, *for_cond, *for_iter, *for_body;
         };
+
+        struct {
+            AST *addr, *rhs;
+        } mem_write;
     };
 };
 
@@ -737,6 +750,14 @@ AST *parse_primary(void)
         AST *ast = parse_expr();
         expect_token(T_RPAREN);
         return ast;
+    }
+
+    if (match_token2(T_IDENT, T_LBRACKET)) {
+        Token *ident_token = pop_token();
+        pop_token();  // discard T_LBRACKET
+        AST *ast = parse_expr();
+        expect_token(T_RBRACKET);
+        return new_unop_ast(AST_MEM_READ, ast);
     }
 
     if (match_token(T_IDENT)) {
@@ -830,6 +851,24 @@ AST *parse_assignment(void)
         ast->assign.varname = varname;
         ast->assign.rhs = rhs;
         return ast;
+    }
+
+    if (match_token2(T_IDENT, T_LBRACKET)) {
+        SAVE_CURRENT_INPUT_TOKENS;
+
+        Token *ident_token = pop_token();
+        pop_token();  // discard T_LBRACKET
+        AST *addr = parse_expr();
+        expect_token(T_RBRACKET);
+        if (pop_token_if(T_EQ)) {
+            AST *rhs = parse_assignment();
+            AST *ast = new_ast(AST_MEM_WRITE, ident_token->loc);
+            ast->mem_write.addr = addr;
+            ast->mem_write.rhs = rhs;
+            return ast;
+        }
+
+        RESTORE_CURRENT_INPUT_TOKENS;
     }
 
     return parse_equality();
@@ -989,7 +1028,13 @@ AST *analyze_detail(AST *ast, Map *alphatbl)
 
     case AST_EXPR_STMT:
     case AST_RETURN:
+    case AST_MEM_READ:
         ast->ast = analyze_detail(ast->ast, alphatbl);
+        break;
+
+    case AST_MEM_WRITE:
+        ast->mem_write.addr = analyze_detail(ast->mem_write.addr, alphatbl);
+        ast->mem_write.rhs = analyze_detail(ast->mem_write.rhs, alphatbl);
         break;
 
     case AST_LNOT:
@@ -1360,6 +1405,23 @@ int generate_code_detail(AST *ast)
         emit("%s:", exit_label);
 
         return -1;
+    }
+
+    case AST_MEM_READ: {
+        int reg_index = generate_code_detail(ast->ast);
+        assert(reg_index != -1);
+        emit("LD R%d, (R%d)", reg_index, reg_index);
+        return reg_index;
+    }
+
+    case AST_MEM_WRITE: {
+        int addr_reg_index = generate_code_detail(ast->mem_write.addr),
+            rhs_reg_index = generate_code_detail(ast->mem_write.rhs);
+        assert(addr_reg_index != -1);
+        assert(rhs_reg_index != -1);
+        give_reg_back(addr_reg_index);
+        emit("ST R%d, (R%d)", rhs_reg_index, addr_reg_index);
+        return rhs_reg_index;
     }
 
     case AST_GT:

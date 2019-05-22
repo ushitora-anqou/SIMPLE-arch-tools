@@ -1406,5 +1406,8 @@ test_compiler "int i; int a; for (i = 0; i < 10; i = i + 1) a = a + 2; return a;
 test_compiler "int a; a = 0; int i; i = 0; for (;i < 10;) { i = i + 1; a = a + 2; } return a; " 20
 test_compiler "while (1) { return 10; }" 10
 test_compiler "for(;;) { return 10; }" 10
+test_compiler "mem[42] = 5; return mem[42];" 5
+test_compiler "int i; mem[42] = 0; for (i = 0; i < 10; i = i + 1) mem[42] = mem[42] + i; return mem[42];" 45
+test_compiler "int i; i = 3; mem[i + i] = i; return mem[i + i];" 3
 
 echo "ok"
