@@ -1403,5 +1403,8 @@ test_compiler "int a; int b; a = 10; b = 0-10; a = a + b; return a;" 0
 test_compiler "int a; int b; a = b = 10; b = 0-a; a = a + b; return a;" 0
 test_compiler "int a; a = 0; int i; i = 0; while (i < 10) { i = i + 1; a = a + 2; } return a; " 20
 test_compiler "int i; int a; for (i = 0; i < 10; i = i + 1) a = a + 2; return a;" 20
+test_compiler "int a; a = 0; int i; i = 0; for (;i < 10;) { i = i + 1; a = a + 2; } return a; " 20
+test_compiler "while (1) { return 10; }" 10
+test_compiler "for(;;) { return 10; }" 10
 
 echo "ok"

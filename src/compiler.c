@@ -900,12 +900,21 @@ AST *parse_iteration_for_stmt(void)
 {
     Token *for_token = expect_token(K_FOR);
     expect_token(T_LPAREN);
-    AST *init = parse_expr();
-    expect_token(T_SEMICOLON);
-    AST *cond = parse_expr();
-    expect_token(T_SEMICOLON);
-    AST *iter = parse_expr();
-    expect_token(T_RPAREN);
+    AST *init = NULL;
+    if (!pop_token_if(T_SEMICOLON)) {
+        init = parse_expr();
+        expect_token(T_SEMICOLON);
+    }
+    AST *cond = NULL;
+    if (!pop_token_if(T_SEMICOLON)) {
+        cond = parse_expr();
+        expect_token(T_SEMICOLON);
+    }
+    AST *iter = NULL;
+    if (!pop_token_if(T_RPAREN)) {
+        iter = parse_expr();
+        expect_token(T_RPAREN);
+    }
     AST *body = parse_stmt();
 
     AST *ast = new_ast(AST_FOR, for_token->loc);
@@ -1054,9 +1063,12 @@ AST *analyze_detail(AST *ast, Map *alphatbl)
     } break;
 
     case AST_FOR: {
-        ast->for_init = analyze_detail(ast->for_init, alphatbl);
-        ast->for_cond = analyze_detail(ast->for_cond, alphatbl);
-        ast->for_iter = analyze_detail(ast->for_iter, alphatbl);
+        if (ast->for_init)
+            ast->for_init = analyze_detail(ast->for_init, alphatbl);
+        if (ast->for_cond)
+            ast->for_cond = analyze_detail(ast->for_cond, alphatbl);
+        if (ast->for_iter)
+            ast->for_iter = analyze_detail(ast->for_iter, alphatbl);
         ast->for_body = analyze_detail(ast->for_body, alphatbl);
     } break;
     }
@@ -1324,20 +1336,26 @@ int generate_code_detail(AST *ast)
         int reg_index;
         char *exit_label = make_label(), *loop_label = make_label();
 
-        reg_index = generate_code_detail(ast->for_init);
-        assert(reg_index != -1);
-        give_reg_back(reg_index);
+        if (ast->for_init) {
+            reg_index = generate_code_detail(ast->for_init);
+            assert(reg_index != -1);
+            give_reg_back(reg_index);
+        }
 
         emit("%s:", loop_label);
-        reg_index = generate_code_detail(ast->for_cond);
-        assert(reg_index != -1);
-        give_reg_back(reg_index);
-        emit("CMP R%d, 0", reg_index);
-        emit("BE %s", exit_label);
+        if (ast->for_cond) {
+            reg_index = generate_code_detail(ast->for_cond);
+            assert(reg_index != -1);
+            give_reg_back(reg_index);
+            emit("CMP R%d, 0", reg_index);
+            emit("BE %s", exit_label);
+        }
         assert(generate_code_detail(ast->for_body) == -1);
-        reg_index = generate_code_detail(ast->for_iter);
-        assert(reg_index != -1);
-        give_reg_back(reg_index);
+        if (ast->for_iter) {
+            reg_index = generate_code_detail(ast->for_iter);
+            assert(reg_index != -1);
+            give_reg_back(reg_index);
+        }
         emit("B %s", loop_label);
         emit("%s:", exit_label);
 
