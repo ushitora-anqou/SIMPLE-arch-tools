@@ -1153,6 +1153,15 @@ R0 = 10
 halt
 " 10
 
+test_macro "
+    LI R0, 1
+    B exit
+    $(seq 127 | xargs -I@ echo "HLT")
+exit:
+    R0 = 10
+    HLT
+" 10
+
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null
