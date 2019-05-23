@@ -1182,7 +1182,7 @@ Vector *analyze(Vector *src)
 typedef struct GenEnv GenEnv;
 struct GenEnv {
     FILE *fh;
-    int var_disp_index, label_index, reg_used_flag[8];
+    int var_disp_index, reg_used_flag[8];
     Map *var2disp;
 };
 
@@ -1191,7 +1191,6 @@ GenEnv *new_gen_env(FILE *fh)
     GenEnv *env = (GenEnv *)malloc(sizeof(GenEnv));
     env->fh = fh;
     env->var_disp_index = 0;
-    env->label_index = 0;
     for (int i = 0; i < 8; i++) env->reg_used_flag[i] = 0;
     env->var2disp = new_map();
 
@@ -1222,7 +1221,7 @@ void give_reg_back(int reg_index)
 
 char *make_label(void)
 {
-    return format(".L%d", env->label_index++);
+    return format(".L%d", count());
 }
 
 void emit(char *fmt, ...)
