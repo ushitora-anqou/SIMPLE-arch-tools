@@ -1234,6 +1234,54 @@ void emit(char *fmt, ...)
     va_end(ap);
 }
 
+int generate_code_detail(AST *ast);
+
+char *generate_cond(AST *ast)
+{
+    assert(ast != NULL);
+
+    switch (ast->kind) {
+    case AST_LT: {
+        int lhs_reg_index = generate_code_detail(ast->lhs),
+            rhs_reg_index = generate_code_detail(ast->rhs);
+        give_reg_back(lhs_reg_index);
+        give_reg_back(rhs_reg_index);
+        emit("CMP R%d, R%d", lhs_reg_index, rhs_reg_index);
+        return "BLT";
+    }
+    case AST_LTE: {
+        int lhs_reg_index = generate_code_detail(ast->lhs),
+            rhs_reg_index = generate_code_detail(ast->rhs);
+        give_reg_back(lhs_reg_index);
+        give_reg_back(rhs_reg_index);
+        emit("CMP R%d, R%d", lhs_reg_index, rhs_reg_index);
+        return "BLE";
+    }
+    case AST_EQ: {
+        int lhs_reg_index = generate_code_detail(ast->lhs),
+            rhs_reg_index = generate_code_detail(ast->rhs);
+        give_reg_back(lhs_reg_index);
+        give_reg_back(rhs_reg_index);
+        emit("CMP R%d, R%d", lhs_reg_index, rhs_reg_index);
+        return "BE";
+    }
+    case AST_NEQ: {
+        int lhs_reg_index = generate_code_detail(ast->lhs),
+            rhs_reg_index = generate_code_detail(ast->rhs);
+        give_reg_back(lhs_reg_index);
+        give_reg_back(rhs_reg_index);
+        emit("CMP R%d, R%d", lhs_reg_index, rhs_reg_index);
+        return "BNE";
+    }
+    default: {
+        int reg_index = generate_code_detail(ast);
+        give_reg_back(reg_index);
+        emit("CMP R%d, 0", reg_index);
+        return "BNE";
+    }
+    }
+}
+
 int generate_code_detail(AST *ast)
 {
     switch (ast->kind) {
@@ -1359,12 +1407,11 @@ int generate_code_detail(AST *ast)
     }
 
     case AST_IF: {
-        int reg_index = generate_code_detail(ast->if_cond);
-        give_reg_back(reg_index);
-        char *exit_label = make_label();
-        assert(reg_index != -1);
-        emit("CMP R%d, 0", reg_index);
-        emit("BE %s", exit_label);
+        char *next_label = make_label(), *exit_label = make_label();
+        char *cond = generate_cond(ast->if_cond);
+        emit("%s %s", cond, next_label);
+        emit("B %s", exit_label);
+        emit("%s:", next_label);
         assert(generate_code_detail(ast->if_body) == -1);
         emit("%s:", exit_label);
         return -1;
@@ -1404,13 +1451,13 @@ int generate_code_detail(AST *ast)
     }
 
     case AST_WHILE: {
-        char *exit_label = make_label(), *loop_label = make_label();
-
+        char *next_label = make_label(), *exit_label = make_label(),
+             *loop_label = make_label();
         emit("%s:", loop_label);
-        int reg_index = generate_code_detail(ast->while_cond);
-        give_reg_back(reg_index);
-        emit("CMP R%d, 0", reg_index);
-        emit("BE %s", exit_label);
+        char *cond = generate_cond(ast->while_cond);
+        emit("%s %s", cond, next_label);
+        emit("B %s", exit_label);
+        emit("%s:", next_label);
         assert(generate_code_detail(ast->while_body) == -1);
         emit("B %s", loop_label);
         emit("%s:", exit_label);
@@ -1430,11 +1477,11 @@ int generate_code_detail(AST *ast)
 
         emit("%s:", loop_label);
         if (ast->for_cond) {
-            reg_index = generate_code_detail(ast->for_cond);
-            assert(reg_index != -1);
-            give_reg_back(reg_index);
-            emit("CMP R%d, 0", reg_index);
-            emit("BE %s", exit_label);
+            char *next_label = make_label();
+            char *cond = generate_cond(ast->for_cond);
+            emit("%s %s", cond, next_label);
+            emit("B %s", exit_label);
+            emit("%s:", next_label);
         }
         assert(generate_code_detail(ast->for_body) == -1);
         if (ast->for_iter) {

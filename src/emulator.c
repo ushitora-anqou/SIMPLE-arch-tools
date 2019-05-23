@@ -3,7 +3,7 @@
 
 #include <getopt.h>
 
-static Word im[64 * 1024];
+static Word im[20000];
 
 int main(int argc, char **argv)
 {
