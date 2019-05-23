@@ -1700,7 +1700,7 @@ int main()
             // TODO: position the label was used?
             failwith(NULL, "Undeclared label: \e[1m%s\e[m", label_name);
         int d = (int)(kv->value) - emit_index - 1;
-        assert(-128 <= d && d <= 127);
+        // assert(-128 <= d && d <= 127);
 
         EmitedLine *line = vector_get(emits, emit_index);
         line->code = format("%s %d", line->code, d);

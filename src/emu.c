@@ -90,6 +90,7 @@ int stepEmu()
     case 0x02: {
         int op2 = (code >> 11) & 0x07, rb = (code >> 8) & 0x07;
         int8_t d = code & 0xff;
+        int16_t d2 = (code & 0x07ff) | ((code & 0x0400) != 0 ? 0xf800 : 0);
 
         switch (op2) {
         case 0x00:        // LI
@@ -106,7 +107,7 @@ int stepEmu()
         case 0x04:  // B
             // PC = PC + 1 + sign_ext(d)
             // note that '+ 1' is executed by 'p++' above.
-            p = p + d;
+            p = p + d2;
             break;
 
         case 0x07: {

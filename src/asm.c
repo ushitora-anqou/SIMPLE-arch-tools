@@ -57,6 +57,11 @@ void read_reg_reg(int *lhs, int *rhs)
 void read_imm(int *v)
 {
     assert(fscanf(fh, " %d %*[#;/] %*256[^\n]", v) == 1);
+}
+
+void read_imm8(int *v)
+{
+    read_imm(v);
     assert_byte(*v);
 }
 
@@ -155,31 +160,34 @@ void assemble()
         else if (streql(op, "B")) {
             int d;
             read_imm(&d);
-            put2338(2, 4, 0, d);
+            if ((int8_t)d == d)
+                put2338(2, 4, d > 0 ? 0 : -1, d);
+            else
+                put2338(2, 4, (uint16_t)d >> 8, (uint16_t)d);
         }
         else if (streql(op, "BE")) {
             int d;
-            read_imm(&d);
+            read_imm8(&d);
             put2338(2, 7, 0, d);
         }
         else if (streql(op, "BLT")) {
             int d;
-            read_imm(&d);
+            read_imm8(&d);
             put2338(2, 7, 1, d);
         }
         else if (streql(op, "BLE")) {
             int d;
-            read_imm(&d);
+            read_imm8(&d);
             put2338(2, 7, 2, d);
         }
         else if (streql(op, "BNE")) {
             int d;
-            read_imm(&d);
+            read_imm8(&d);
             put2338(2, 7, 3, d);
         }
         else if (streql(op, "BAL")) {
             int d;
-            read_imm(&d);
+            read_imm8(&d);
             put2338(2, 7, 4, d);
         }
         else if (streql(op, "BR")) {

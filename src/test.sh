@@ -220,6 +220,23 @@ BE   1
 LI   R0, 0
 HLT" 0
 
+test_assembler "
+LI R0, 1
+B 128
+$(seq 128 | xargs -I@ echo "HLT")
+LI R0, 10
+HLT
+" 10
+
+test_assembler "
+LI R0, 1
+B 129
+LI R0, 5
+$(seq 128 | xargs -I@ echo "HLT")
+LI R0, 10
+B -131
+" 5
+
 test_assembler_in_mif_format(){
     res=$(echo "$1" | ./assembler -mif)
     diff -bB <(echo "$res") <(echo "$2") || \
@@ -234,7 +251,7 @@ B -2" "
 0000 : 8308;
 0001 : 85FE;
 0002 : EB00;
-0003 : A0FE;"
+0003 : A7FE;"
 
 ### macro
 
@@ -1160,6 +1177,16 @@ test_macro "
 exit:
     R0 = 10
     HLT
+" 10
+
+test_macro "
+    LI R0, 1
+    B exit
+loop:
+    $(seq 128 | xargs -I@ echo "HLT")
+exit:
+    R0 = 10
+    goto loop
 " 10
 
 test_macro_error() {
