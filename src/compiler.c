@@ -1229,7 +1229,7 @@ void emit(char *fmt, ...)
     va_list ap;
     va_start(ap, fmt);
     char *buf = vformat(fmt, ap);
-    fprintf(env->fh, "%s\n", buf);
+    fprintf(env->fh, buf[0] == '.' ? "%s\n" : "\t%s\n", buf);
     free(buf);
     va_end(ap);
 }
