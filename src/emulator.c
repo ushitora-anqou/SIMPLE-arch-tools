@@ -7,11 +7,12 @@ static Word im[20000];
 
 int main(int argc, char **argv)
 {
-    int quiet_flag = 0, memdump_flag = 0, force_flag = 0;
+    int quiet_flag = 0, memdump_flag = 0, force_flag = 0,
+        register_dump_flag = 0;
     char *initial_membin_path = NULL;
 
     int opt;
-    while ((opt = getopt(argc, argv, "qdfm:")) != -1) {
+    while ((opt = getopt(argc, argv, "qdfrm:")) != -1) {
         switch (opt) {
         case 'q':
             quiet_flag = 1;
@@ -25,9 +26,12 @@ int main(int argc, char **argv)
         case 'm':
             initial_membin_path = new_string(optarg);
             break;
+        case 'r':
+            register_dump_flag = 1;
+            break;
         default:
             fprintf(stderr,
-                    "Usage: %s [-q] [-d] [-f] [-m initial-membin-path]\n",
+                    "Usage: %s [-q] [-d] [-f] [-r] [-m initial-membin-path]\n",
                     argv[0]);
             exit(EXIT_FAILURE);
         }
@@ -77,6 +81,14 @@ int main(int argc, char **argv)
     }
 
     if (!quiet_flag) printf("#insts: %d\n", ninsts);
+
+    if (register_dump_flag) {
+        for (int i = 0; i < 8; i++) {
+            printf("R%-3d = %04X\t", i, getRegVal(i));
+            if (i % 2 == 1) puts("");
+        }
+        printf("SZCV = %d%d%d%d\n", checkS(), checkZ(), checkC(), checkV());
+    }
 
     return getRegVal(0);
 }
