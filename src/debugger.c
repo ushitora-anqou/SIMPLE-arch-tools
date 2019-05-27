@@ -115,6 +115,19 @@ int main(int argc, char **argv)
             else if (prompt_buf[0] == 'q') {
                 exit(0);
             }
+            else if (prompt_buf[0] == 'm') {
+                int dst_lineno;
+                if (sscanf(prompt_buf, "m %d\n", &dst_lineno) != 1) {
+                    puts("ERROR: invalid format");
+                    puts("Usage: b <dst lineno>");
+                    continue;
+                }
+                Word *mem = getMEM();
+                for (int i = 0; i < dst_lineno; i++) {
+                    printf("%04X : %04X\n", i, mem[i]);
+                }
+                continue;
+            }
 
         invalid_command:
             puts("ERROR: invalid command");
