@@ -1,10 +1,12 @@
 #include <assert.h>
 #include <ctype.h>
+#include <getopt.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
 #include "utility.h"
 
 typedef struct Token_tag Token;
@@ -140,6 +142,13 @@ int map_erase(Map *map, const char *key)
 
     return erased_cnt;
 }
+
+typedef struct Config Config;
+struct Config {
+    int print_return, var_disp_dump;
+};
+
+static Config *config;
 
 static int line_row = 0, line_column = 0;
 static Vector *input_lines = NULL;
@@ -664,6 +673,9 @@ struct AST {
         AST_FOR,
         AST_MEM_READ,
         AST_MEM_WRITE,
+        AST_BUILTIN_OUTPUT,
+        AST_BUILTIN_LOAD,
+        AST_BUILTIN_HALT,
     } kind;
 
     union {
@@ -696,6 +708,11 @@ struct AST {
         struct {
             AST *addr, *rhs;
         } mem_write;
+
+        struct {
+            int reg_index;
+            char *varname;
+        } builtin_load;
     };
 };
 
@@ -772,14 +789,54 @@ AST *parse_primary(void)
     return parse_unsigned_integer();
 }
 
-AST *parse_unary(void)
+AST *parse_postfix(void)
 {
-    if (pop_token_if(T_EXCLAM)) {
-        AST *ast = new_unop_ast(AST_LNOT, parse_primary());
+    if (match_token2(T_IDENT, T_LPAREN)) {
+        // pseudo function call
+        Token *ident_token = pop_token();
+        char *ident = ident_token->sval;
+        pop_token();  // discard T_LPAREN
+
+        AST *ast = NULL;
+        if (streql(ident, "__builtin_output")) {
+            ast = new_unop_ast(AST_BUILTIN_OUTPUT, parse_expr());
+        }
+        else if (streql(ident, "__builtin_load")) {
+            char *reg_ident = expect_token(T_IDENT)->sval;
+            expect_token(T_COMMA);
+            char *varname = expect_token(T_IDENT)->sval;
+
+            if (reg_ident == NULL || strlen(reg_ident) != 2 ||
+                reg_ident[0] != 'R' ||
+                !('0' <= reg_ident[1] && reg_ident[1] <= '7'))
+                failwith(&ident_token->loc, "Invalid use of __builtin_load()");
+
+            ast = new_ast(AST_BUILTIN_LOAD, ident_token->loc);
+            ast->builtin_load.reg_index = reg_ident[1] - '0';
+            ast->builtin_load.varname = varname;
+        }
+        else if (streql(ident, "__builtin_halt")) {
+            ast = new_ast(AST_BUILTIN_HALT, ident_token->loc);
+        }
+        else {
+            failwith(&ident_token->loc, "Invalid use of pseudo function call");
+        }
+
+        expect_token(T_RPAREN);
         return ast;
     }
 
     return parse_primary();
+}
+
+AST *parse_unary(void)
+{
+    if (pop_token_if(T_EXCLAM)) {
+        AST *ast = new_unop_ast(AST_LNOT, parse_postfix());
+        return ast;
+    }
+
+    return parse_postfix();
 }
 
 AST *parse_additive(void)
@@ -1046,6 +1103,7 @@ AST *analyze_detail(AST *ast, AnalysisEnv *env)
 {
     switch (ast->kind) {
     case AST_INTEGER:
+    case AST_BUILTIN_HALT:
         break;
 
     case AST_ADD:
@@ -1073,6 +1131,7 @@ AST *analyze_detail(AST *ast, AnalysisEnv *env)
     case AST_EXPR_STMT:
     case AST_RETURN:
     case AST_MEM_READ:
+    case AST_BUILTIN_OUTPUT:
         ast->ast = analyze_detail(ast->ast, env);
         break;
 
@@ -1157,6 +1216,13 @@ AST *analyze_detail(AST *ast, AnalysisEnv *env)
         if (ast->for_cond) ast->for_cond = analyze_detail(ast->for_cond, env);
         if (ast->for_iter) ast->for_iter = analyze_detail(ast->for_iter, env);
         ast->for_body = analyze_detail(ast->for_body, env);
+    } break;
+
+    case AST_BUILTIN_LOAD: {
+        char *new_varname = ae_lookup_alphatbl(env, ast->builtin_load.varname);
+        if (new_varname == NULL)
+            failwith(&ast->loc, "Not declared variable: " HL_IDENT, ast->sval);
+        ast->builtin_load.varname = new_varname;
     } break;
     }
 
@@ -1393,16 +1459,20 @@ int generate_code_detail(AST *ast)
     }
 
     case AST_EXPR_STMT: {
-        give_reg_back(generate_code_detail(ast->ast));
+        int reg_index = generate_code_detail(ast->ast);
+        assert(reg_index != -1);
+        if (reg_index >= 0) give_reg_back(reg_index);
         return -1;
     }
 
     case AST_RETURN: {
-        int reg_index = generate_code_detail(ast->ast);
-        assert(reg_index != -1);
-        emit("MOV R0, R%d", reg_index);
-        emit("HLT");
-        give_reg_back(reg_index);
+        if (config->print_return) {
+            int reg_index = generate_code_detail(ast->ast);
+            assert(reg_index != -1);
+            emit("MOV R0, R%d", reg_index);
+            emit("HLT");
+            give_reg_back(reg_index);
+        }
         return -1;
     }
 
@@ -1512,6 +1582,25 @@ int generate_code_detail(AST *ast)
         return rhs_reg_index;
     }
 
+    case AST_BUILTIN_OUTPUT: {
+        int reg_index = generate_code_detail(ast->ast);
+        emit("OUT R%d", reg_index);
+        return reg_index;
+    }
+
+    case AST_BUILTIN_LOAD: {
+        KeyValue *kv = map_lookup(env->var2disp, ast->builtin_load.varname);
+        assert(kv != NULL);
+        int reg_index = ast->builtin_load.reg_index, disp = (int)kv->value;
+        emit("LD R%d, %d(SP)", reg_index, disp);
+        return -2;
+    }
+
+    case AST_BUILTIN_HALT: {
+        emit("HLT");
+        return -2;
+    } break;
+
     case AST_GT:
     case AST_GTE:
         assert(0);
@@ -1536,10 +1625,43 @@ void generate_code(FILE *fh, Vector *ast)
     }
 
     give_reg_back(sp_reg_index);
+
+    if (config->var_disp_dump) {
+        // TODO: map iteration
+        Vector *data = env->var2disp->data;
+        for (int i = 0; i < vector_size(data); i++) {
+            KeyValue *kv = (KeyValue *)vector_get(data, i);
+            if (kv == NULL) continue;
+            fprintf(stderr, "%4d : %s\n", (int)kv->value, (char *)kv->key);
+        }
+    }
 }
 
-int main()
+void parse_options(int argc, char **argv)
 {
+    config = (Config *)malloc(sizeof(Config));
+    config->print_return = 1;
+    config->var_disp_dump = 0;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "de")) != -1) {
+        switch (opt) {
+        case 'e':
+            config->print_return = 0;
+            break;
+        case 'd':
+            config->var_disp_dump = 1;
+            break;
+        default:
+            fprintf(stderr, "Usage: %s [-d] [-e]\n", argv[0]);
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
+int main(int argc, char **argv)
+{
+    parse_options(argc, argv);
     read_all_tokens(stdin);
     Vector *ast = parse();
     ast = analyze(ast);
