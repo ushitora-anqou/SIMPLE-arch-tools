@@ -29,9 +29,14 @@ void assert_reg(int reg)
     assert(0 <= reg && reg < 8);
 }
 
-void assert_byte(int n)
+void assert_unsigned(int nbits, int num)
 {
-    assert(-128 <= n && n <= 255);
+    assert(0 <= num && num < (int)(1u << nbits));
+}
+
+void assert_signed(int nbits, int num)
+{
+    assert(-(int)(1u << (nbits - 1)) <= num && num < (int)(1u << (nbits - 1)));
 }
 
 void read_reg(int *lhs)
@@ -44,7 +49,6 @@ void read_reg_imm(int *lhs, int *rhs)
 {
     assert(fscanf(fh, " R%d , %d %*[#;/] %*256[^\n]", lhs, rhs) == 2);
     assert_reg(*lhs);
-    assert_byte(*rhs);
 }
 
 void read_reg_reg(int *lhs, int *rhs)
@@ -59,10 +63,10 @@ void read_imm(int *v)
     assert(fscanf(fh, " %d %*[#;/] %*256[^\n]", v) == 1);
 }
 
-void read_imm8(int *v)
+void read_signed_imm8(int *v)
 {
     read_imm(v);
-    assert_byte(*v);
+    assert_signed(8, *v);
 }
 
 void read_reg_mem(int *ra, int *rb, int *d)
@@ -70,7 +74,7 @@ void read_reg_mem(int *ra, int *rb, int *d)
     assert(fscanf(fh, " R%d , %d ( R%d ) %*[#;/] %*256[^\n]", ra, d, rb) == 3);
     assert_reg(*ra);
     assert_reg(*rb);
-    assert_byte(*d);
+    assert_signed(8, *d);
 }
 
 void assemble()
@@ -115,31 +119,37 @@ void assemble()
         else if (streql(op, "ADDI")) {
             int rd, d;
             read_reg_imm(&rd, &d);
+            assert_signed(4, d);
             put23344(3, 0, rd, 7, d);
         }
         else if (streql(op, "SLL")) {
             int rd, d;
             read_reg_imm(&rd, &d);
+            assert_unsigned(4, d);
             put23344(3, 0, rd, 8, d);
         }
         else if (streql(op, "SLR")) {
             int rd, d;
             read_reg_imm(&rd, &d);
+            assert_unsigned(4, d);
             put23344(3, 0, rd, 9, d);
         }
         else if (streql(op, "SRL")) {
             int rd, d;
             read_reg_imm(&rd, &d);
+            assert_unsigned(4, d);
             put23344(3, 0, rd, 10, d);
         }
         else if (streql(op, "SRA")) {
             int rd, d;
             read_reg_imm(&rd, &d);
+            assert_unsigned(4, d);
             put23344(3, 0, rd, 11, d);
         }
         else if (streql(op, "CMPI")) {
             int rd, d;
             read_reg_imm(&rd, &d);
+            assert_signed(4, d);
             put23344(3, 0, rd, 14, d);
         }
         else if (streql(op, "LD")) {
@@ -155,11 +165,13 @@ void assemble()
         else if (streql(op, "LI")) {
             int rb, d;
             read_reg_imm(&rb, &d);
+            assert_signed(8, d);
             put2338(2, 0, rb, d);
         }
         else if (streql(op, "B")) {
             int d;
             read_imm(&d);
+            assert_signed(11, d);
             if ((int8_t)d == d)
                 put2338(2, 4, d > 0 ? 0 : -1, d);
             else
@@ -167,27 +179,32 @@ void assemble()
         }
         else if (streql(op, "BE")) {
             int d;
-            read_imm8(&d);
+            read_signed_imm8(&d);
+            assert_signed(8, d);
             put2338(2, 7, 0, d);
         }
         else if (streql(op, "BLT")) {
             int d;
-            read_imm8(&d);
+            read_signed_imm8(&d);
+            assert_signed(8, d);
             put2338(2, 7, 1, d);
         }
         else if (streql(op, "BLE")) {
             int d;
-            read_imm8(&d);
+            read_signed_imm8(&d);
+            assert_signed(8, d);
             put2338(2, 7, 2, d);
         }
         else if (streql(op, "BNE")) {
             int d;
-            read_imm8(&d);
+            read_signed_imm8(&d);
+            assert_signed(8, d);
             put2338(2, 7, 3, d);
         }
         else if (streql(op, "BAL")) {
             int d;
-            read_imm8(&d);
+            read_signed_imm8(&d);
+            assert_signed(8, d);
             put2338(2, 7, 4, d);
         }
         else if (streql(op, "BR")) {
