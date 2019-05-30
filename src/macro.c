@@ -593,27 +593,42 @@ Token *next_token()
 
             if (ch == '0') {
                 ch = get_char();
-                if (ch != 'x') {  // just 0
-                    unget_char();
+
+                switch (ch) {
+                case 'x': {  // hex
+                    int ival = 0;
+                    while (1) {
+                        ch = get_char();
+                        if (isdigit(ch))
+                            ival = ival * 16 + ch - '0';
+                        else if ('A' <= ch && ch <= 'F')
+                            ival = ival * 16 + ch - 'A' + 10;
+                        else if ('a' <= ch && ch <= 'f')
+                            ival = ival * 16 + ch - 'a' + 10;
+                        else
+                            break;
+                    }
+                    token->ival = ival;
+                } break;
+
+                case 'b': {  // binary
+                    int ival = 0;
+                    while (1) {
+                        ch = get_char();
+                        if (ch == '0' || ch == '1')
+                            ival = ival * 2 + ch - '0';
+                        else
+                            break;
+                    }
+                    token->ival = ival;
+                } break;
+
+                default:
                     token->ival = 0;
-                    return token;
+                    break;
                 }
 
-                // hex number
-                int ival = 0;
-                while (1) {
-                    ch = get_char();
-                    if (isdigit(ch))
-                        ival = ival * 16 + ch - '0';
-                    else if ('A' <= ch && ch <= 'F')
-                        ival = ival * 16 + ch - 'A' + 10;
-                    else if ('a' <= ch && ch <= 'f')
-                        ival = ival * 16 + ch - 'a' + 10;
-                    else
-                        break;
-                }
                 unget_char();
-                token->ival = ival;
                 return token;
             }
 
