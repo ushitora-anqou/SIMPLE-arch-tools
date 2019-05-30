@@ -1,6 +1,6 @@
 #include "debugger.h"
 
-static Word *p;
+static Word *p, *pc_start;
 static Word mem[0x5000], reg[8];
 static Word cflag;
 enum { FLAG_S, FLAG_Z, FLAG_C, FLAG_V };
@@ -72,6 +72,8 @@ int stepEmu()
 {
     Word code = *p;
     int op = code >> 14;
+
+    assert(p >= pc_start);
 
     p++;
     switch (op) {
@@ -240,6 +242,7 @@ int stepEmu()
 void initialize_emu(Word *im)
 {
     p = im;
+    pc_start = p;
 }
 
 Word getRegVal(int index)
