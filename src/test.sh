@@ -1194,6 +1194,11 @@ test_macro "
     HLT
 "  10
 
+test_macro "
+    LI R0, 0b1'01'0
+    HLT
+"  10
+
 test_macro_error() {
     res=$(echo -n "$1" | ./macro 2>&1)
     echo $res | egrep "$2" > /dev/null

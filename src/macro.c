@@ -617,6 +617,8 @@ Token *next_token()
                         ch = get_char();
                         if (ch == '0' || ch == '1')
                             ival = ival * 2 + ch - '0';
+                        else if (ch == '\'')
+                            continue;
                         else
                             break;
                     }
