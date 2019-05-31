@@ -644,6 +644,16 @@ Token *pop_token_if(int kind)
     return NULL;
 }
 
+int expect_register()
+{
+    Token *token = pop_token();
+    if (!(token != NULL && token->kind == T_IDENT && strlen(token->sval) == 2 &&
+          token->sval[0] == 'R' && '0' <= token->sval[1] &&
+          token->sval[1] <= '7'))
+        failwith_unexpected_token(token, token2str(token), "register");
+    return token->sval[1] - '0';
+}
+
 typedef struct AST AST;
 typedef enum AST_KIND AST_KIND;
 struct AST {
@@ -674,6 +684,7 @@ struct AST {
         AST_MEM_READ,
         AST_MEM_WRITE,
         AST_BUILTIN_OUTPUT,
+        AST_BUILTIN_INPUT,
         AST_BUILTIN_LOAD,
         AST_BUILTIN_HALT,
     } kind;
@@ -801,18 +812,16 @@ AST *parse_postfix(void)
         if (streql(ident, "__builtin_output")) {
             ast = new_unop_ast(AST_BUILTIN_OUTPUT, parse_expr());
         }
+        else if (streql(ident, "__builtin_input")) {
+            ast = new_ast(AST_BUILTIN_INPUT, ident_token->loc);
+        }
         else if (streql(ident, "__builtin_load")) {
-            char *reg_ident = expect_token(T_IDENT)->sval;
+            int reg_index = expect_register();
             expect_token(T_COMMA);
             char *varname = expect_token(T_IDENT)->sval;
 
-            if (reg_ident == NULL || strlen(reg_ident) != 2 ||
-                reg_ident[0] != 'R' ||
-                !('0' <= reg_ident[1] && reg_ident[1] <= '7'))
-                failwith(&ident_token->loc, "Invalid use of __builtin_load()");
-
             ast = new_ast(AST_BUILTIN_LOAD, ident_token->loc);
-            ast->builtin_load.reg_index = reg_ident[1] - '0';
+            ast->builtin_load.reg_index = reg_index;
             ast->builtin_load.varname = varname;
         }
         else if (streql(ident, "__builtin_halt")) {
@@ -1104,6 +1113,7 @@ AST *analyze_detail(AST *ast, AnalysisEnv *env)
     switch (ast->kind) {
     case AST_INTEGER:
     case AST_BUILTIN_HALT:
+    case AST_BUILTIN_INPUT:
         break;
 
     case AST_ADD:
@@ -1221,7 +1231,8 @@ AST *analyze_detail(AST *ast, AnalysisEnv *env)
     case AST_BUILTIN_LOAD: {
         char *new_varname = ae_lookup_alphatbl(env, ast->builtin_load.varname);
         if (new_varname == NULL)
-            failwith(&ast->loc, "Not declared variable: " HL_IDENT, ast->sval);
+            failwith(&ast->loc, "Not declared variable: " HL_IDENT,
+                     ast->builtin_load.varname);
         ast->builtin_load.varname = new_varname;
     } break;
     }
@@ -1585,6 +1596,12 @@ int generate_code_detail(AST *ast)
     case AST_BUILTIN_OUTPUT: {
         int reg_index = generate_code_detail(ast->ast);
         emit("OUT R%d", reg_index);
+        return reg_index;
+    }
+
+    case AST_BUILTIN_INPUT: {
+        int reg_index = get_reg();
+        emit("IN R%d", reg_index);
         return reg_index;
     }
 
