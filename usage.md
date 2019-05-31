@@ -262,7 +262,7 @@ $ ./aqdb.sh ../examples/radix_sort1bit.s -m random.membin
 繰り返し回数が予め分かっているループについてはループ・アンローリングを行うことでブランチ回数を減らすことができる。
 マクロアセンブラをコピペして行ってもよいが、`erb`を使うと便利である。
 すなわち[ERB](https://docs.ruby-lang.org/ja/latest/class/ERB.html)を用いてアセンブリを書き、
-`macro`に入力する前に`erb`にフィルターする。詳細は`examples/*.s`を参照のこと。
+`macro`に入力する前に`erb`にフィルターする。詳細は`examples/radix4bit_insert_sort_with_muno.s`などを参照のこと。
 
 ## 独自ISA
 
@@ -337,7 +337,7 @@ $ ./aqdb.sh ../examples/radix_sort1bit.s -m random.membin
     - マクロを定義できる。すなわち、この行よりあとの全ての`name`は`body`に置換される。`examples/fibonmem_macro.s`などを参照のこと。
 - `inline name (args...) { body... }`
     - なし。
-    - 引数付きマクロを定義できる。すなわち、この行よりあとの全ての`name(args...)`は`body...`に置換される。自動的にlabel namespaceを付与するなどの機能がある。詳細は`examples/*.s`やソースコードを参照のこと。
+    - 引数付きマクロを定義できる。すなわち、この行よりあとの全ての`name(args...)`は`body...`に置換される。自動的にlabel namespaceを付与するなどの機能がある。詳細は`examples/sort/*.s`やソースコードを参照のこと。
 
 ## バグかな？と思ったら
 
